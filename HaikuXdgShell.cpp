@@ -1,5 +1,6 @@
 #include "HaikuXdgShell.h"
 #include "HaikuXdgSurface.h"
+#include "HaikuXdgPositioner.h"
 #include "HaikuCompositor.h"
 #include "Wayland.h"
 #include <wayland-server-core.h>
@@ -14,60 +15,6 @@ static void Assert(bool cond) {if (!cond) abort();}
 
 
 //#pragma mark - HaikuXdgPositioner
-
-class HaikuXdgPositioner: public XdgPositioner {
-public:
-	void HandleDestroy() final;
-	void HandleSetSize(int32_t width, int32_t height) final;
-	void HandleSetAnchorRect(int32_t x, int32_t y, int32_t width, int32_t height) final;
-	void HandleSetAnchor(uint32_t anchor) final;
-	void HandleSetGravity(uint32_t gravity) final;
-	void HandleSetConstraintAdjustment(uint32_t constraint_adjustment) final;
-	void HandleSetOffset(int32_t x, int32_t y) final;
-	void HandleSetReactive() final;
-	void HandleSetParentSize(int32_t parent_width, int32_t parent_height) final;
-	void HandleSetParentConfigure(uint32_t serial) final;
-};
-
-void HaikuXdgPositioner::HandleDestroy()
-{
-}
-
-void HaikuXdgPositioner::HandleSetSize(int32_t width, int32_t height)
-{
-}
-
-void HaikuXdgPositioner::HandleSetAnchorRect(int32_t x, int32_t y, int32_t width, int32_t height)
-{
-}
-
-void HaikuXdgPositioner::HandleSetAnchor(uint32_t anchor)
-{
-}
-
-void HaikuXdgPositioner::HandleSetGravity(uint32_t gravity)
-{
-}
-
-void HaikuXdgPositioner::HandleSetConstraintAdjustment(uint32_t constraint_adjustment)
-{
-}
-
-void HaikuXdgPositioner::HandleSetOffset(int32_t x, int32_t y)
-{
-}
-
-void HaikuXdgPositioner::HandleSetReactive()
-{
-}
-
-void HaikuXdgPositioner::HandleSetParentSize(int32_t parent_width, int32_t parent_height)
-{
-}
-
-void HaikuXdgPositioner::HandleSetParentConfigure(uint32_t serial)
-{
-}
 
 
 
@@ -95,14 +42,7 @@ void HaikuXdgClient::HandleDestroy()
 
 void HaikuXdgClient::HandleCreatePositioner(uint32_t id)
 {
-	HaikuXdgPositioner *positioner = new(std::nothrow) HaikuXdgPositioner();
-	if (positioner == NULL) {
-		wl_client_post_no_memory(Client());
-		return;
-	}
-	if (!positioner->Init(Client(), wl_resource_get_version(ToResource()), id)) {
-		return;
-	}
+	HaikuXdgPositioner *positioner = HaikuXdgPositioner::Create(this, id);
 }
 
 void HaikuXdgClient::HandleGetXdgSurface(uint32_t id, struct wl_resource *surface_resource)

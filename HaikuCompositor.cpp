@@ -4,6 +4,7 @@
 #include "HaikuXdgPopup.h"
 #include "HaikuSeat.h"
 #include "Wayland.h"
+#include "WaylandEnv.h"
 #include <wayland-server-core.h>
 #include <wayland-server-protocol.h>
 #include <stdio.h>
@@ -122,6 +123,7 @@ WaylandView::WaylandView(HaikuSurface *surface, BRect frame, const char* name, u
 
 void WaylandView::WindowActivated(bool active)
 {
+	WaylandEnv wlEnv(this);
 	HaikuSeat *seat = HaikuGetSeat(fSurface->Client());
 	if (seat == NULL) return;
 	seat->SetKeyboardFocus(fSurface, active);
@@ -129,17 +131,23 @@ void WaylandView::WindowActivated(bool active)
 
 void WaylandView::MessageReceived(BMessage *msg)
 {
-	HaikuSeat *seat = HaikuGetSeat(fSurface->Client());
-	if (seat == NULL) BView::MessageReceived(msg);
-
-	if (seat->MessageReceived(fSurface, msg)) {
-		return;
+	{
+		WaylandEnv wlEnv(this);
+		HaikuSeat *seat = HaikuGetSeat(fSurface->Client());
+	
+		if (seat != NULL && seat->MessageReceived(fSurface, msg)) {
+			return;
+		}
 	}
 	BView::MessageReceived(msg);
 }
 
 
 //#pragma mark - HaikuSurface
+
+HaikuSurface::~HaikuSurface()
+{
+}
 
 void HaikuSurface::AttachWindow(BWindow *window)
 {
@@ -151,13 +159,28 @@ void HaikuSurface::AttachWindow(BWindow *window)
 
 void HaikuSurface::SetHook(Hook *hook)
 {
-	hook->fBase = this;
+	if (hook != NULL) {hook->fBase = this;}
 	fHook.SetTo(hook);
 }
 
 
 void HaikuSurface::HandleDestroy()
 {
+	printf("HaikuSurface::HandleDestroy(), id: %" PRIu32 "\n", ToResource()->object.id);
+	fHook.Unset();
+/*
+	if (fView != NULL) {
+		fView->RemoveSelf();
+		delete fView;
+		fView = NULL;
+	}
+*/
+	HaikuSeat *seat = HaikuGetSeat(Client());
+	if (seat != NULL) {
+		seat->SetPointerFocus(this, false, B_ORIGIN);
+		seat->SetKeyboardFocus(this, false);
+	}
+
 	wl_resource_destroy(ToResource());
 }
 

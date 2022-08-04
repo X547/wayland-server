@@ -50,6 +50,11 @@ void XdgSurfaceHook::HandleCommit()
 		if (fXdgSurface->fToplevel != NULL) {
 			fXdgSurface->fToplevel->SendConfigure(0, 0, &array);
 		}
+		if (fXdgSurface->fPopup != NULL) {
+			BRect wndRect = fXdgSurface->fPopup->Window()->Frame();
+			fXdgSurface->fPopup->fParent->Window()->ConvertFromScreen(&wndRect);
+			fXdgSurface->fPopup->SendConfigure(wndRect.left, wndRect.top, (int32_t)wndRect.Width() + 1, (int32_t)wndRect.Height() + 1);
+		}
 		fXdgSurface->fConfigureCalled = true;
 		fXdgSurface->SendConfigure(fXdgSurface->NextSerial());
 	}
@@ -63,9 +68,17 @@ uint32_t HaikuXdgSurface::NextSerial()
 	return (uint32_t)atomic_add((int32*)&fSerial, 1);
 }
 
+BWindow *HaikuXdgSurface::Window()
+{
+	if (fToplevel != NULL) return fToplevel->Window();
+	if (fPopup != NULL) return fPopup->Window();
+	return NULL;
+}
+
 
 void HaikuXdgSurface::HandleDestroy()
 {
+	fSurface->SetHook(NULL);
 	wl_resource_destroy(ToResource());
 }
 
@@ -76,7 +89,7 @@ void HaikuXdgSurface::HandleGetToplevel(uint32_t id)
 
 void HaikuXdgSurface::HandleGetPopup(uint32_t id, struct wl_resource *parent, struct wl_resource *positioner)
 {
-	fPopup = HaikuXdgPopup::Create(this, id);
+	fPopup = HaikuXdgPopup::Create(this, id, parent, positioner);
 }
 
 void HaikuXdgSurface::HandleSetWindowGeometry(int32_t x, int32_t y, int32_t width, int32_t height)
@@ -88,11 +101,14 @@ void HaikuXdgSurface::HandleSetWindowGeometry(int32_t x, int32_t y, int32_t widt
 	if (fSurface->View() == NULL) {
 		return;
 	}
+/*
 	x -= 10; y -= 10;
 	width += 20;
 	height += 20;
+*/
 	AppKitPtrs::LockedPtr(fSurface->View())->MoveTo(-x, -y);
-	fToplevel->Window()->ResizeTo(width - 1, height - 1);
+	if (Window())
+		Window()->ResizeTo(width - 1, height - 1);
 }
 
 void HaikuXdgSurface::HandleAckConfigure(uint32_t serial)

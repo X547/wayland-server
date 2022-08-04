@@ -3,6 +3,7 @@
 #include "HaikuXdgSurface.h"
 #include "HaikuCompositor.h"
 #include "HaikuSeat.h"
+#include "WaylandEnv.h"
 #include <wayland-server-core.h>
 #include <wayland-server-protocol.h>
 #include <xdg-shell-protocol.h>
@@ -16,6 +17,7 @@ static void Assert(bool cond) {if (!cond) abort();}
 
 class WaylandWindow: public BWindow {
 private:
+	friend class HaikuXdgToplevel;
 	HaikuXdgToplevel *fToplevel;
 
 public:
@@ -36,12 +38,16 @@ WaylandWindow::WaylandWindow(HaikuXdgToplevel *toplevel, BRect frame, const char
 
 bool WaylandWindow::QuitRequested()
 {
+	WaylandEnv vlEnv(this);
+	if (fToplevel == NULL)
+		return true;
 	fToplevel->SendClose();
 	return false;
 }
 
 void WaylandWindow::FrameResized(float newWidth, float newHeight)
 {
+	WaylandEnv vlEnv(this);
 	return;
 
 	if (fToplevel->fResizePending) return;
@@ -145,6 +151,11 @@ HaikuXdgToplevel *HaikuXdgToplevel::Create(HaikuXdgSurface *xdgSurface, uint32_t
 
 HaikuXdgToplevel::~HaikuXdgToplevel()
 {
-	fWindow->Lock();
-	fWindow->Quit();
+	if (fWindow != NULL) {
+		fWindow->fToplevel = NULL;
+		fWindow->PostMessage(B_QUIT_REQUESTED);
+		//fWindow->Lock();
+		//fWindow->Quit();
+		fWindow = NULL;
+	}
 }

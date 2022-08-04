@@ -70,6 +70,7 @@ private:
 public:
 	static HaikuSurface *Create(struct wl_client *client, uint32_t version, uint32_t id);
 	static HaikuSurface *FromResource(struct wl_resource *resource) {return (HaikuSurface*)WlResource::FromResource(resource);}
+	virtual ~HaikuSurface();
 
 	BView *View() {return (BView*)fView;}
 	BBitmap *Bitmap() {return fBitmap.Get();}

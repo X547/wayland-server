@@ -201,7 +201,6 @@ uint32_t HaikuSeat::NextSerial()
 
 void HaikuSeat::SetPointerFocus(HaikuSurface *surface, bool setFocus, const BPoint &where)
 {
-	BAutolock lock(fLock);
 	if (setFocus) {
 		if (fPointerFocus != surface) {
 			if (fPointerFocus != NULL) {
@@ -221,7 +220,6 @@ void HaikuSeat::SetPointerFocus(HaikuSurface *surface, bool setFocus, const BPoi
 
 void HaikuSeat::SetKeyboardFocus(HaikuSurface *surface, bool setFocus)
 {
-	BAutolock lock(fLock);
 	if (fKeyboard == NULL) return;
 	if (setFocus) {
 		if (fKeyboardFocus != surface) {
@@ -240,7 +238,6 @@ void HaikuSeat::SetKeyboardFocus(HaikuSurface *surface, bool setFocus)
 
 void HaikuSeat::DoTrack(TrackId id, XdgToplevel::ResizeEdge resizeEdge)
 {
-	BAutolock lock(fLock);
 	if (fTrack.id != trackClient || fOldMouseBtns == 0) return;
 	fTrack.id = id;
 	fTrack.resizeEdge = resizeEdge;
@@ -253,8 +250,6 @@ void HaikuSeat::DoTrack(TrackId id, XdgToplevel::ResizeEdge resizeEdge)
 
 bool HaikuSeat::MessageReceived(HaikuSurface *surface, BMessage *msg)
 {
-	BAutolock lock(fLock);
-
 	if (fTrack.id == trackNone && msg->what == B_MOUSE_MOVED) {
 		int32 transit;
 		msg->FindInt32("be:transit", &transit);
@@ -315,7 +310,7 @@ bool HaikuSeat::MessageReceived(HaikuSurface *surface, BMessage *msg)
 			if (oldBtns == 0 && btns != 0) {
 				fTrack.id = trackClient;
 				fTrack.origin = where;
-				surface->View()->SetMouseEventMask(B_POINTER_EVENTS);
+				AppKitPtrs::LockedPtr(surface->View())->SetMouseEventMask(B_POINTER_EVENTS);
 			}
 			fOldMouseBtns = btns;
 			switch (fTrack.id) {

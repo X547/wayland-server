@@ -41,7 +41,9 @@ public:
 	uint32_t NextSerial();
 	bool SetConfigurePending() {if (fConfigurePending) return false; else fConfigurePending = true; return true;}
 	struct GeometryInfo Geometry() {return fGeometry;}
+	HaikuSurface *Surface() {return fSurface;}
 	HaikuXdgToplevel *Toplevel() {return fToplevel;}
+	BWindow *Window();
 
 	void HandleDestroy() override;
 	void HandleGetToplevel(uint32_t id) override;

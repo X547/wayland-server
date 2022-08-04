@@ -36,7 +36,6 @@ private:
 		XdgToplevel::ResizeEdge resizeEdge;
 	};
 
-	BLocker fLock;
 	uint32_t fSerial = 1;
 	HaikuPointer *fPointer{};
 	HaikuKeyboard *fKeyboard{};
