@@ -255,6 +255,10 @@ void HaikuSeat::DoTrack(TrackId id, XdgToplevel::ResizeEdge resizeEdge)
 
 bool HaikuSeat::MessageReceived(HaikuSurface *surface, BMessage *msg)
 {
+	// TODO: properly set pointer focus when new window created
+	// TODO: fix global stopping of pointer input after GTK combo box selection
+	// TODO: fix mouse whell scrolling in GTK 3
+
 	if (fTrack.id == trackNone && msg->what == B_MOUSE_MOVED) {
 		int32 transit;
 		msg->FindInt32("be:transit", &transit);
@@ -421,6 +425,7 @@ bool HaikuSeat::MessageReceived(HaikuSurface *surface, BMessage *msg)
 
 void HaikuSeat::HandleGetPointer(uint32_t id)
 {
+	// TODO: allow creating multiple interface instances?
 	HaikuPointer *pointer = new(std::nothrow) HaikuPointer();
 	if (pointer == NULL) {
 		wl_client_post_no_memory(Client());
@@ -434,6 +439,7 @@ void HaikuSeat::HandleGetPointer(uint32_t id)
 
 void HaikuSeat::HandleGetKeyboard(uint32_t id)
 {
+	// TODO: allow creating multiple interface instances?
 	HaikuKeyboard *keyboard = new(std::nothrow) HaikuKeyboard();
 	if (keyboard == NULL) {
 		wl_client_post_no_memory(Client());

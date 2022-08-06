@@ -99,7 +99,6 @@ extern "C" _EXPORT int wl_ips_client_connected(void **clientOut, void *clientDis
 	struct wl_client *client = wl_client_create_ips(display, clientDisplay, (client_enqueue_proc)wl_display_enqueue);
 	fprintf(stderr, "client: %p\n", client);
 
-	// TODO: unify global creation
 	Assert(wl_display_init_shm(display) == 0);
 	Assert(HaikuCompositor::CreateGlobal(display) != NULL);
 	Assert(HaikuOutput::CreateGlobal(display) != NULL);
