@@ -3,20 +3,21 @@
 #include "HaikuCompositor.h"
 
 class HaikuSurface;
-class HaikuXdgClient;
+class HaikuXdgWmBase;
 class HaikuXdgToplevel;
 class HaikuXdgPopup;
 
 class HaikuXdgSurface: public XdgSurface {
 public:
 	struct GeometryInfo {
+		bool valid;
 		int32_t x;
 		int32_t y;
 		int32_t width;
 		int32_t height;
 	};
 
-	HaikuXdgClient *client;
+	HaikuXdgWmBase *client;
 
 private:
 	friend class HaikuXdgToplevel;
@@ -30,12 +31,13 @@ private:
 	uint32_t fSerial = 1;
 	uint32_t fAckSerial = 1;
 	bool fConfigureCalled = false;
+	bool fSurfaceInitalized = false;
 	bool fConfigurePending = false;
 	GeometryInfo fGeometry{};
 
 public:
 	virtual ~HaikuXdgSurface() {}
-	static HaikuXdgSurface *Create(struct HaikuXdgClient *client, struct HaikuSurface *surface, uint32_t id);
+	static HaikuXdgSurface *Create(struct HaikuXdgWmBase *client, struct HaikuSurface *surface, uint32_t id);
 	static HaikuXdgSurface *FromResource(struct wl_resource *resource) {return (HaikuXdgSurface*)WlResource::FromResource(resource);}
 
 	uint32_t NextSerial();

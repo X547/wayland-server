@@ -3,6 +3,7 @@
 #include "HaikuXdgToplevel.h"
 #include "HaikuXdgPopup.h"
 #include "HaikuCompositor.h"
+#include "HaikuServerDecoration.h"
 #include <wayland-server-core.h>
 #include <wayland-server-protocol.h>
 #include <xdg-shell-protocol.h>
@@ -35,16 +36,13 @@ void XdgSurfaceHook::HandleCommit()
 	if (Base()->View() != NULL) {
 		auto viewLocked = AppKitPtrs::LockedPtr(Base()->View());
 		if (bitmap != NULL) {
-			viewLocked->SetDrawingMode(B_OP_ALPHA);
-			viewLocked->SetViewBitmap(bitmap);
 			viewLocked->ResizeTo(bitmap->Bounds().Width(), bitmap->Bounds().Height());
-			viewLocked->Invalidate();
 		} else {
-			viewLocked->ClearViewBitmap();
-			viewLocked->Invalidate();
 		}
+		Base()->Invalidate();
 	}
 
+	// TODO: move to HaikuXdgToplevel/HaikuXdgPopup
 	if (!fXdgSurface->fConfigureCalled) {
 		static struct wl_array array{};
 		if (fXdgSurface->fToplevel != NULL) {
@@ -57,6 +55,36 @@ void XdgSurfaceHook::HandleCommit()
 		}
 		fXdgSurface->fConfigureCalled = true;
 		fXdgSurface->SendConfigure(fXdgSurface->NextSerial());
+	}
+
+	if (fXdgSurface->Surface()->Bitmap() != NULL) {
+		BSize oldSize = fXdgSurface->Window()->Size();
+		BSize newSize = oldSize;
+		if (fXdgSurface->Geometry().valid && fXdgSurface->Surface()->ServerDecoration() != NULL && fXdgSurface->Surface()->ServerDecoration()->Mode() == OrgKdeKwinServerDecoration::modeServer) {
+			if (fXdgSurface->Surface()->View() != NULL)
+				AppKitPtrs::LockedPtr(fXdgSurface->Surface()->View())->MoveTo(-fXdgSurface->Geometry().x, -fXdgSurface->Geometry().y);
+			newSize.width = fXdgSurface->Geometry().width - 1;
+			newSize.height = fXdgSurface->Geometry().height - 1;
+		} else {
+			newSize = fXdgSurface->Surface()->Bitmap()->Bounds().Size();
+		}
+		if (oldSize != newSize)
+			fXdgSurface->Window()->ResizeTo(newSize.width, newSize.height);
+	}
+	if (!fXdgSurface->fSurfaceInitalized && fXdgSurface->Surface()->Bitmap() != NULL) {
+		if (fXdgSurface->Surface()->ServerDecoration() != NULL) {
+			fXdgSurface->Window()->SetLook(fXdgSurface->Surface()->ServerDecoration()->Look());
+		}
+		if (fXdgSurface->fToplevel != NULL) {
+			fXdgSurface->Window()->CenterOnScreen();
+		}
+/*
+		if (fXdgSurface->fPopup != NULL) {
+			fXdgSurface->Window()->MoveBy(-fXdgSurface.Geometry().x, -fXdgSurface.Geometry().y);
+		}
+*/
+		fXdgSurface->Window()->Show();
+		fXdgSurface->fSurfaceInitalized = true;
 	}
 }
 
@@ -94,21 +122,11 @@ void HaikuXdgSurface::HandleGetPopup(uint32_t id, struct wl_resource *parent, st
 
 void HaikuXdgSurface::HandleSetWindowGeometry(int32_t x, int32_t y, int32_t width, int32_t height)
 {
+	fGeometry.valid = true;
 	fGeometry.x = x;
 	fGeometry.y = y;
 	fGeometry.width = width;
 	fGeometry.height = height;
-	if (fSurface->View() == NULL) {
-		return;
-	}
-/*
-	x -= 10; y -= 10;
-	width += 20;
-	height += 20;
-*/
-	AppKitPtrs::LockedPtr(fSurface->View())->MoveTo(-x, -y);
-	if (Window())
-		Window()->ResizeTo(width - 1, height - 1);
 }
 
 void HaikuXdgSurface::HandleAckConfigure(uint32_t serial)
@@ -118,7 +136,7 @@ void HaikuXdgSurface::HandleAckConfigure(uint32_t serial)
 }
 
 
-HaikuXdgSurface *HaikuXdgSurface::Create(struct HaikuXdgClient *client, struct HaikuSurface *surface, uint32_t id)
+HaikuXdgSurface *HaikuXdgSurface::Create(struct HaikuXdgWmBase *client, struct HaikuSurface *surface, uint32_t id)
 {
 	HaikuXdgSurface *xdgSurface = new(std::nothrow) HaikuXdgSurface();
 	if (!xdgSurface) {

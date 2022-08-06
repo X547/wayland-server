@@ -48,20 +48,22 @@ void HaikuXdgPopup::CalcWndRect(BRect &wndRect, struct wl_resource *_positioner)
 	}
 	if (posState.valid.anchorRect) {
 		BPoint parentPos = fParent->Window()->ConvertToScreen(B_ORIGIN);
+		//parentPos.x += fParent->Geometry().x;
+		//parentPos.y += fParent->Geometry().y;
 		wndRect.OffsetToSelf(parentPos.x + posState.anchorRect.x, parentPos.y + posState.anchorRect.y);
 		if (posState.valid.anchor) {
 			switch (posState.anchor) {
 				case XdgPositioner::anchorTop:
-					wndRect.OffsetBySelf(posState.anchorRect.width/2, 0);
+					wndRect.OffsetBySelf(posState.anchorRect.width/2 - posState.size.width/2, 0);
 					break;
 				case XdgPositioner::anchorBottom:
-					wndRect.OffsetBySelf(posState.anchorRect.width/2, posState.anchorRect.height);
+					wndRect.OffsetBySelf(posState.anchorRect.width/2 - posState.size.width/2, posState.anchorRect.height);
 					break;
 				case XdgPositioner::anchorLeft:
-					wndRect.OffsetBySelf(0, posState.anchorRect.height/2);
+					wndRect.OffsetBySelf(0, posState.anchorRect.height/2 - posState.size.height/2);
 					break;
 				case XdgPositioner::anchorRight:
-					wndRect.OffsetBySelf(posState.anchorRect.width, posState.anchorRect.height/2);
+					wndRect.OffsetBySelf(posState.anchorRect.width, posState.anchorRect.height/2 - posState.size.height/2);
 					break;
 				case XdgPositioner::anchorTopLeft:
 					break;
@@ -96,11 +98,9 @@ HaikuXdgPopup *HaikuXdgPopup::Create(HaikuXdgSurface *xdgSurface, uint32_t id, s
 	BRect wndRect;
 	xdgPopup->CalcWndRect(wndRect, _positioner);
 
-	xdgPopup->fWindow = new WaylandPopupWindow(xdgPopup, wndRect, "", B_BORDERED_WINDOW_LOOK, B_FLOATING_SUBSET_WINDOW_FEEL, 0);
+	xdgPopup->fWindow = new WaylandPopupWindow(xdgPopup, wndRect, "", B_NO_BORDER_WINDOW_LOOK, B_NORMAL_WINDOW_FEEL, B_AVOID_FOCUS);
 	xdgSurface->Surface()->AttachWindow(xdgPopup->fWindow);
-	//xdgPopup->fWindow->CenterOnScreen();
 	xdgPopup->fWindow->AddToSubset(xdgPopup->fParent->Window());
-	xdgPopup->fWindow->Show();
 
 	return xdgPopup;
 }

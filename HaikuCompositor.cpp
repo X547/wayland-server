@@ -18,6 +18,8 @@
 #include <Region.h>
 #include <Cursor.h>
 
+extern const struct wl_interface wl_compositor_interface;
+
 
 #define COMPOSITOR_VERSION 4
 
@@ -56,12 +58,29 @@ void HaikuRegion::HandleSubtract(int32_t x, int32_t y, int32_t width, int32_t he
 
 //#pragma mark - compositor
 
-void haiku_compositor::HandleCreateSurface(uint32_t id)
+struct wl_global *HaikuCompositor::CreateGlobal(struct wl_display *display)
 {
-	HaikuSurface *surface = HaikuSurface::Create(client, wl_resource_get_version(ToResource()), id);
+	return wl_global_create(display, &wl_compositor_interface, COMPOSITOR_VERSION, NULL, HaikuCompositor::Bind);
 }
 
-void haiku_compositor::HandleCreateRegion(uint32_t id)
+void HaikuCompositor::Bind(struct wl_client *wl_client, void *data, uint32_t version, uint32_t id)
+{
+	HaikuCompositor *manager = new(std::nothrow) HaikuCompositor();
+	if (manager == NULL) {
+		wl_client_post_no_memory(wl_client);
+		return;
+	}
+	if (!manager->Init(wl_client, version, id)) {
+		return;
+	}
+}
+
+void HaikuCompositor::HandleCreateSurface(uint32_t id)
+{
+	HaikuSurface *surface = HaikuSurface::Create(Client(), wl_resource_get_version(ToResource()), id);
+}
+
+void HaikuCompositor::HandleCreateRegion(uint32_t id)
 {
 	HaikuRegion *region = new(std::nothrow) HaikuRegion();
 	if (region == NULL) {
@@ -71,28 +90,6 @@ void haiku_compositor::HandleCreateRegion(uint32_t id)
 	if (!region->Init(Client(), wl_resource_get_version(ToResource()), id)) {
 		return;
 	}
-}
-
-
-static void compositor_bind(struct wl_client *wl_client, void *data, uint32_t version, uint32_t id) {
-	haiku_compositor *compositor_global = (struct haiku_compositor *)data;
-
-	haiku_compositor *compositor = new(std::nothrow) haiku_compositor();
-	if (compositor == NULL) {
-		wl_client_post_no_memory(wl_client);
-		return;
-	}
-	if (!compositor->Init(wl_client, version, id)) {
-		return;
-	}
-	compositor->client = wl_client;
-}
-
-haiku_compositor *haiku_compositor_create(struct wl_display *display)
-{
-	haiku_compositor *compositor = new haiku_compositor();
-	compositor->global = wl_global_create(display, compositor->Interface(), COMPOSITOR_VERSION, compositor, compositor_bind);
-	return compositor;
 }
 
 
@@ -110,8 +107,8 @@ public:
 	HaikuSurface *Surface() {return fSurface;}
 	
 	void WindowActivated(bool active) final;
-
 	void MessageReceived(BMessage *msg) final;
+	void Draw(BRect dirty);
 };
 
 
@@ -142,31 +139,30 @@ void WaylandView::MessageReceived(BMessage *msg)
 	BView::MessageReceived(msg);
 }
 
+void WaylandView::Draw(BRect dirty)
+{
+	WaylandEnv wlEnv(this);
+	BBitmap *bmp = fSurface->Bitmap();
+	if (bmp != NULL) {
+		AppKitPtrs::LockedPtr(this)->DrawBitmap(bmp);
+	}
+}
+
 
 //#pragma mark - HaikuSurface
 
+HaikuSurface *HaikuSurface::Create(struct wl_client *client, uint32_t version, uint32_t id)
+{
+	HaikuSurface *surface = new(std::nothrow) HaikuSurface();
+	if (!surface->Init(client, version, id)) {
+		return NULL;
+	}
+	surface->fClient = client;
+	return surface;
+}
+
 HaikuSurface::~HaikuSurface()
 {
-}
-
-void HaikuSurface::AttachWindow(BWindow *window)
-{
-	fView = new WaylandView(this, BRect(), "WaylandView", B_FOLLOW_NONE, 0);
-	fView->SetDrawingMode(B_OP_ALPHA);
-	window->AddChild(fView);
-	fView->MakeFocus();
-}
-
-void HaikuSurface::SetHook(Hook *hook)
-{
-	if (hook != NULL) {hook->fBase = this;}
-	fHook.SetTo(hook);
-}
-
-
-void HaikuSurface::HandleDestroy()
-{
-	printf("HaikuSurface::HandleDestroy(), id: %" PRIu32 "\n", ToResource()->object.id);
 	fHook.Unset();
 /*
 	if (fView != NULL) {
@@ -180,7 +176,31 @@ void HaikuSurface::HandleDestroy()
 		seat->SetPointerFocus(this, false, B_ORIGIN);
 		seat->SetKeyboardFocus(this, false);
 	}
+}
 
+void HaikuSurface::AttachWindow(BWindow *window)
+{
+	fView = new WaylandView(this, BRect(), "WaylandView", B_FOLLOW_NONE, B_WILL_DRAW);
+	fView->SetDrawingMode(B_OP_ALPHA);
+	window->AddChild(fView);
+	fView->MakeFocus();
+}
+
+void HaikuSurface::Invalidate()
+{
+	AppKitPtrs::LockedPtr(fView)->Invalidate(&fDirty);
+	fDirty.MakeEmpty();
+}
+
+void HaikuSurface::SetHook(Hook *hook)
+{
+	if (hook != NULL) {hook->fBase = this;}
+	fHook.SetTo(hook);
+}
+
+
+void HaikuSurface::HandleDestroy()
+{
 	wl_resource_destroy(ToResource());
 }
 
@@ -194,6 +214,7 @@ void HaikuSurface::HandleAttach(struct wl_resource *buffer_resource, int32_t dx,
 
 void HaikuSurface::HandleDamage(int32_t x, int32_t y, int32_t width, int32_t height)
 {
+	fDirty.Include(BRect(x, y, x + width - 1, y + height - 1));
 }
 
 void HaikuSurface::HandleFrame(uint32_t callback_id)
@@ -272,15 +293,4 @@ void HaikuSurface::HandleOffset(int32_t x, int32_t y)
 {
 	fPendingState.dx = x;
 	fPendingState.dy = y;
-}
-
-
-HaikuSurface *HaikuSurface::Create(struct wl_client *client, uint32_t version, uint32_t id)
-{
-	HaikuSurface *surface = new(std::nothrow) HaikuSurface();
-	if (!surface->Init(client, version, id)) {
-		return NULL;
-	}
-	surface->fClient = client;
-	return surface;
 }

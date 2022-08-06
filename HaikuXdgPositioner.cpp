@@ -2,7 +2,7 @@
 #include "HaikuXdgShell.h"
 
 
-HaikuXdgPositioner *HaikuXdgPositioner::Create(HaikuXdgClient *client, uint32_t id)
+HaikuXdgPositioner *HaikuXdgPositioner::Create(HaikuXdgWmBase *client, uint32_t id)
 {
 	HaikuXdgPositioner *positioner = new(std::nothrow) HaikuXdgPositioner();
 	if (positioner == NULL) {

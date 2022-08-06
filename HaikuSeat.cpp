@@ -179,6 +179,11 @@ void HaikuKeyboard::HandleRelease()
 
 //#pragma mark - HaikuSeat
 
+struct wl_global *HaikuSeat::CreateGlobal(struct wl_display *display)
+{
+	return wl_global_create(display, &wl_seat_interface, SEAT_VERSION, NULL, HaikuSeat::Bind);
+}
+
 void HaikuSeat::Bind(struct wl_client *wl_client, void *data, uint32_t version, uint32_t id)
 {
 	HaikuSeat *seat = new(std::nothrow) HaikuSeat();
@@ -453,9 +458,4 @@ void HaikuSeat::HandleRelease()
 HaikuSeat *HaikuGetSeat(struct wl_client *wl_client)
 {
 	return sHaikuSeat;
-}
-
-struct wl_global *HaikuSeatCreate(struct wl_display *display)
-{
-	return wl_global_create(display, &wl_seat_interface, SEAT_VERSION, NULL, HaikuSeat::Bind);
 }

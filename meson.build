@@ -24,6 +24,7 @@ protocols = {
 	'presentation-time': wl_protocol_dir / 'stable/presentation-time/presentation-time.xml',
 	'viewporter': wl_protocol_dir / 'stable/viewporter/viewporter.xml',
 	'activation-v1': wl_protocol_dir / 'staging/xdg-activation/xdg-activation-v1.xml',
+	'server-decoration': 'protocols/server-decoration.xml',
 }
 
 wlr_files = []
@@ -66,6 +67,7 @@ protocols_cpp = {
 	'PresentationTime': wl_protocol_dir / 'stable/presentation-time/presentation-time.xml',
 	'Viewporter': wl_protocol_dir / 'stable/viewporter/viewporter.xml',
 	'XdgActivationV1': wl_protocol_dir / 'staging/xdg-activation/xdg-activation-v1.xml',
+	'ServerDecoration': 'protocols/server-decoration.xml',
 }
 
 foreach name, path : protocols_cpp
@@ -97,6 +99,7 @@ shared_library('wayland-server-inproc',
 		'HaikuXdgSurface.cpp',
 		'HaikuXdgToplevel.cpp',
 		'HaikuXdgPopup.cpp',
+		'HaikuServerDecoration.cpp',
 		'HaikuOutput.cpp',
 		'HaikuSeat.cpp',
 		'HaikuDataDeviceManager.cpp',

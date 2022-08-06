@@ -3,6 +3,7 @@
 #include "HaikuXdgSurface.h"
 #include "HaikuCompositor.h"
 #include "HaikuSeat.h"
+#include "HaikuServerDecoration.h"
 #include "WaylandEnv.h"
 #include <wayland-server-core.h>
 #include <wayland-server-protocol.h>
@@ -48,15 +49,19 @@ bool WaylandWindow::QuitRequested()
 void WaylandWindow::FrameResized(float newWidth, float newHeight)
 {
 	WaylandEnv vlEnv(this);
-	return;
+	if(!(
+		fToplevel->XdgSurface()->Geometry().valid &&
+		fToplevel->XdgSurface()->Surface()->ServerDecoration() != NULL &&
+		fToplevel->XdgSurface()->Surface()->ServerDecoration()->Mode() == OrgKdeKwinServerDecoration::modeServer
+	))
+		return;
 
-	if (fToplevel->fResizePending) return;
-	fToplevel->fResizePending = true;
+	//if (fToplevel->fResizePending) return;
+	//fToplevel->fResizePending = true;
 
 	static struct wl_array array{};
-	static uint32_t serial = 2;
 	fToplevel->SendConfigure((int32_t)newWidth + 1, (int32_t)newHeight + 1, &array);
-	fToplevel->XdgSurface()->SendConfigure(serial++);
+	fToplevel->XdgSurface()->SendConfigure(fToplevel->XdgSurface()->NextSerial());
 }
 
 
@@ -141,10 +146,8 @@ HaikuXdgToplevel *HaikuXdgToplevel::Create(HaikuXdgSurface *xdgSurface, uint32_t
 	}
 
 	xdgToplevel->fXdgSurface = xdgSurface;
-	xdgToplevel->fWindow = new WaylandWindow(xdgToplevel, BRect(0, 0, 255, 255), "", B_TITLED_WINDOW_LOOK, B_NORMAL_WINDOW_FEEL, 0);
+	xdgToplevel->fWindow = new WaylandWindow(xdgToplevel, BRect(), "", B_NO_BORDER_WINDOW_LOOK, B_NORMAL_WINDOW_FEEL, 0);
 	xdgSurface->fSurface->AttachWindow(xdgToplevel->fWindow);
-	xdgToplevel->fWindow->CenterOnScreen();
-	xdgToplevel->fWindow->Show();
 
 	return xdgToplevel;
 }

@@ -1,5 +1,4 @@
 #include "HaikuDataDeviceManager.h"
-#include "Wayland.h"
 #include <Screen.h>
 
 extern const struct wl_interface wl_data_device_manager_interface;
@@ -51,19 +50,16 @@ void HaikuDataDevice::HandleSetSelection(struct wl_resource *source, uint32_t se
 
 void HaikuDataDevice::HandleRelease()
 {
+	wl_resource_destroy(ToResource());
 }
 
 
 //#pragma mark - HaikuDataDeviceManager
 
-class HaikuDataDeviceManager: public WlDataDeviceManager {
-public:
-	static void Bind(struct wl_client *wl_client, void *data, uint32_t version, uint32_t id);
-
-	void HandleCreateDataSource(uint32_t id) final;
-	void HandleGetDataDevice(uint32_t id, struct wl_resource *seat) final;
-};
-
+struct wl_global *HaikuDataDeviceManager::CreateGlobal(struct wl_display *display)
+{
+	return wl_global_create(display, &wl_data_device_manager_interface, DATA_DEVICE_MANAGER_VERSION, NULL, HaikuDataDeviceManager::Bind);
+}
 
 void HaikuDataDeviceManager::Bind(struct wl_client *wl_client, void *data, uint32_t version, uint32_t id)
 {
@@ -99,10 +95,4 @@ void HaikuDataDeviceManager::HandleGetDataDevice(uint32_t id, struct wl_resource
 	if (!dataDevice->Init(Client(), wl_resource_get_version(ToResource()), id)) {
 		return;
 	}
-}
-
-
-struct wl_global *HaikuDataDeviceManager(struct wl_display *display)
-{
-	return wl_global_create(display, &wl_data_device_manager_interface, DATA_DEVICE_MANAGER_VERSION, NULL, HaikuDataDeviceManager::Bind);
 }

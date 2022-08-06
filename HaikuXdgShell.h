@@ -9,21 +9,21 @@ struct HaikuXdgShell {
 	struct wl_list clients;
 };
 
-class HaikuXdgClient: public XdgWmBase {
+class HaikuXdgWmBase: public XdgWmBase {
 public:
 	HaikuXdgShell *shell;
 
 	struct wl_list link; // wlr_xdg_shell.clients
 
+	static void Bind(struct wl_client *wl_client, void *data, uint32_t version, uint32_t id);
+
 public:
-	virtual ~HaikuXdgClient();
-	static HaikuXdgClient *FromResource(struct wl_resource *resource) {return (HaikuXdgClient*)WlResource::FromResource(resource);}
+	static struct wl_global *CreateGlobal(struct wl_display *display);
+	virtual ~HaikuXdgWmBase();
+	static HaikuXdgWmBase *FromResource(struct wl_resource *resource) {return (HaikuXdgWmBase*)WlResource::FromResource(resource);}
 
 	void HandleDestroy() override;
 	void HandleCreatePositioner(uint32_t id) override;
 	void HandleGetXdgSurface(uint32_t id, struct wl_resource *surface) override;
 	void HandlePong(uint32_t serial) override;
 };
-
-
-struct HaikuXdgShell *HaikuXdgShellCreate(struct wl_display *display);

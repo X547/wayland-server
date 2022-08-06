@@ -2,7 +2,7 @@
 #include "XdgShell.h"
 
 
-class HaikuXdgClient;
+class HaikuXdgWmBase;
 
 class HaikuXdgPositioner: public XdgPositioner {
 public:
@@ -52,7 +52,7 @@ private:
 	State fState{};
 
 public:
-	static HaikuXdgPositioner *Create(HaikuXdgClient *client, uint32_t id);
+	static HaikuXdgPositioner *Create(HaikuXdgWmBase *client, uint32_t id);
 	static HaikuXdgPositioner *FromResource(struct wl_resource *resource) {return (HaikuXdgPositioner*)WlResource::FromResource(resource);}
 
 	const State &GetState() const {return fState;}

@@ -1,5 +1,4 @@
 #include "HaikuOutput.h"
-#include "Wayland.h"
 #include <Screen.h>
 
 extern const struct wl_interface wl_output_interface;
@@ -10,13 +9,10 @@ enum {
 };
 
 
-class HaikuOutput: public WlOutput {
-public:
-	static void Bind(struct wl_client *wl_client, void *data, uint32_t version, uint32_t id);
-
-	void HandleRelease() final;
-};
-
+struct wl_global *HaikuOutput::CreateGlobal(struct wl_display *display)
+{
+	return wl_global_create(display, &wl_output_interface, OUTPUT_VERSION, NULL, HaikuOutput::Bind);
+}
 
 void HaikuOutput::Bind(struct wl_client *wl_client, void *data, uint32_t version, uint32_t id)
 {
@@ -40,10 +36,5 @@ void HaikuOutput::Bind(struct wl_client *wl_client, void *data, uint32_t version
 
 void HaikuOutput::HandleRelease()
 {
-}
-
-
-struct wl_global *HaikuOutputCreate(struct wl_display *display)
-{
-	return wl_global_create(display, &wl_output_interface, OUTPUT_VERSION, NULL, HaikuOutput::Bind);
+	wl_resource_destroy(ToResource());
 }

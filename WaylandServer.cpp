@@ -6,6 +6,7 @@
 #include "HaikuOutput.h"
 #include "HaikuDataDeviceManager.h"
 #include "HaikuSeat.h"
+#include "HaikuServerDecoration.h"
 
 #include <wayland-server-core.h>
 #include <wayland-server-protocol.h>
@@ -35,7 +36,7 @@ struct HaikuSurface;
 HaikuSurface *haiku_surface_from_resource(struct wl_resource *resource);
 
 HaikuSurface *haiku_surface_create(struct wl_client *client, uint32_t version, uint32_t id);
-HaikuXdgSurface *haiku_xdg_surface_create(struct HaikuXdgClient *client, struct HaikuSurface *surface, uint32_t id);
+HaikuXdgSurface *haiku_xdg_surface_create(struct HaikuXdgWmBase *client, struct HaikuSurface *surface, uint32_t id);
 
 
 class Application: public BApplication {
@@ -98,12 +99,14 @@ extern "C" _EXPORT int wl_ips_client_connected(void **clientOut, void *clientDis
 	struct wl_client *client = wl_client_create_ips(display, clientDisplay, (client_enqueue_proc)wl_display_enqueue);
 	fprintf(stderr, "client: %p\n", client);
 
+	// TODO: unify global creation
 	Assert(wl_display_init_shm(display) == 0);
-	haiku_compositor_create(display);
-	Assert(HaikuOutputCreate(display) != NULL);
-	Assert(HaikuDataDeviceManager(display) != NULL);
-	Assert(HaikuSeatCreate(display) != NULL);
-	HaikuXdgShellCreate(display);
+	Assert(HaikuCompositor::CreateGlobal(display) != NULL);
+	Assert(HaikuOutput::CreateGlobal(display) != NULL);
+	Assert(HaikuDataDeviceManager::CreateGlobal(display) != NULL);
+	Assert(HaikuSeat::CreateGlobal(display) != NULL);
+	Assert(HaikuXdgWmBase::CreateGlobal(display) != NULL);
+	Assert(HaikuServerDecorationManager::CreateGlobal(display) != NULL);
 
 	gClientDisplay = clientDisplay;
 	*clientOut = client;

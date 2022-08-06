@@ -44,8 +44,10 @@ private:
 	uint32 fOldMouseBtns{};
 	Track fTrack;
 
-public:
 	static void Bind(struct wl_client *wl_client, void *data, uint32_t version, uint32_t id);
+
+public:
+	static struct wl_global *CreateGlobal(struct wl_display *display);
 	static HaikuSeat *FromResource(struct wl_resource *resource) {return (HaikuSeat*)WlResource::FromResource(resource);}
 
 	uint32_t NextSerial();
@@ -65,4 +67,3 @@ public:
 
 
 HaikuSeat *HaikuGetSeat(struct wl_client *wl_client);
-struct wl_global *HaikuSeatCreate(struct wl_display *display);

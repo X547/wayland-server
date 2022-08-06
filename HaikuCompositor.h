@@ -3,22 +3,23 @@
 #include "Wayland.h"
 #include <AutoDeleter.h>
 #include <Point.h>
+#include <Region.h>
 
 class HaikuXdgSurface;
+class HaikuServerDecoration;
 class WaylandView;
 class BBitmap;
 class BWindow;
 class BView;
 
 
-class haiku_compositor: public WlCompositor {
+class HaikuCompositor: public WlCompositor {
 public:
-	struct wl_global *global;
-	struct wl_client *client;
+	static void Bind(struct wl_client *wl_client, void *data, uint32_t version, uint32_t id);
 
 public:
-	static haiku_compositor *Create(struct wl_client *client, uint32_t version, uint32_t id);
-	static haiku_compositor *FromResource(struct wl_resource *resource) {return (haiku_compositor*)WlResource::FromResource(resource);}
+	static struct wl_global *CreateGlobal(struct wl_display *display);
+	static HaikuCompositor *FromResource(struct wl_resource *resource) {return (HaikuCompositor*)WlResource::FromResource(resource);}
 
 	void HandleCreateSurface(uint32_t id) override;
 	void HandleCreateRegion(uint32_t id) override;
@@ -40,6 +41,7 @@ public:
 private:
 	friend class HaikuXdgSurface;
 	friend class HaikuXdgToplevel;
+	friend class HaikuServerDecoration;
 
 	struct Buffer {
 		int32_t stride{};
@@ -61,9 +63,11 @@ private:
 	State fState;
 	State fPendingState;
 	Buffer fBuffer;
+	BRegion fDirty;
 	ObjectDeleter<BBitmap> fBitmap;
 	WaylandView *fView;
 	HaikuXdgSurface *fXdgSurface{};
+	HaikuServerDecoration *fServerDecoration{};
 
 	struct wl_resource *fCallback{};
 
@@ -75,7 +79,9 @@ public:
 	BView *View() {return (BView*)fView;}
 	BBitmap *Bitmap() {return fBitmap.Get();}
 	HaikuXdgSurface *XdgSurface() {return fXdgSurface;}
+	HaikuServerDecoration *ServerDecoration() {return fServerDecoration;}
 	void AttachWindow(BWindow *window);
+	void Invalidate();
 
 	void SetHook(Hook *hook);
 
@@ -91,6 +97,3 @@ public:
 	void HandleDamageBuffer(int32_t x, int32_t y, int32_t width, int32_t height) override;
 	void HandleOffset(int32_t x, int32_t y) override;
 };
-
-
-haiku_compositor *haiku_compositor_create(struct wl_display *display);
