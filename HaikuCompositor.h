@@ -85,7 +85,6 @@ public:
 
 	void SetHook(Hook *hook);
 
-	void HandleDestroy() override;
 	void HandleAttach(struct wl_resource *buffer_resource, int32_t dx, int32_t dy) override;
 	void HandleDamage(int32_t x, int32_t y, int32_t width, int32_t height) override;
 	void HandleFrame(uint32_t callback) override;

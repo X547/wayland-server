@@ -37,7 +37,6 @@ class HaikuDataDevice: public WlDataDevice {
 public:
 	void HandleStartDrag(struct wl_resource *source, struct wl_resource *origin, struct wl_resource *icon, uint32_t serial) final;
 	void HandleSetSelection(struct wl_resource *source, uint32_t serial) final;
-	void HandleRelease() final;
 };
 
 void HaikuDataDevice::HandleStartDrag(struct wl_resource *source, struct wl_resource *origin, struct wl_resource *icon, uint32_t serial)
@@ -46,11 +45,6 @@ void HaikuDataDevice::HandleStartDrag(struct wl_resource *source, struct wl_reso
 
 void HaikuDataDevice::HandleSetSelection(struct wl_resource *source, uint32_t serial)
 {
-}
-
-void HaikuDataDevice::HandleRelease()
-{
-	wl_resource_destroy(ToResource());
 }
 
 

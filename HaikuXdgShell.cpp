@@ -64,11 +64,6 @@ HaikuXdgWmBase::~HaikuXdgWmBase()
 	wl_list_remove(&link);
 }
 
-void HaikuXdgWmBase::HandleDestroy()
-{
-	wl_resource_destroy(ToResource());
-}
-
 void HaikuXdgWmBase::HandleCreatePositioner(uint32_t id)
 {
 	HaikuXdgPositioner *positioner = HaikuXdgPositioner::Create(this, id);

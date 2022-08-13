@@ -44,9 +44,8 @@ void XdgSurfaceHook::HandleCommit()
 
 	// TODO: move to HaikuXdgToplevel/HaikuXdgPopup
 	if (!fXdgSurface->fConfigureCalled) {
-		static struct wl_array array{};
 		if (fXdgSurface->fToplevel != NULL) {
-			fXdgSurface->fToplevel->SendConfigure(0, 0, &array);
+			fXdgSurface->fToplevel->DoSendConfigure();
 		}
 		if (fXdgSurface->fPopup != NULL) {
 			BRect wndRect = fXdgSurface->fPopup->Window()->Frame();
@@ -90,6 +89,11 @@ void XdgSurfaceHook::HandleCommit()
 
 
 //#pragma mark - HaikuXdgSurface
+HaikuXdgSurface::~HaikuXdgSurface()
+{
+	fSurface->SetHook(NULL);
+}
+
 
 uint32_t HaikuXdgSurface::NextSerial()
 {
@@ -103,12 +107,6 @@ BWindow *HaikuXdgSurface::Window()
 	return NULL;
 }
 
-
-void HaikuXdgSurface::HandleDestroy()
-{
-	fSurface->SetHook(NULL);
-	wl_resource_destroy(ToResource());
-}
 
 void HaikuXdgSurface::HandleGetToplevel(uint32_t id)
 {

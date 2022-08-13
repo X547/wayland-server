@@ -24,6 +24,12 @@ bool WlResource::Init(struct wl_client *wl_client, uint32_t version, uint32_t id
 	return true;
 }
 
+void WlResource::Destroy()
+{
+	wl_resource_destroy(ToResource());
+	fResource = NULL;
+}
+
 WlResource *WlResource::FromResource(struct wl_resource *resource)
 {
 	WlResource *resourceOut = (WlResource*)wl_resource_get_user_data(resource);

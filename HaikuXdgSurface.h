@@ -36,7 +36,7 @@ private:
 	GeometryInfo fGeometry{};
 
 public:
-	virtual ~HaikuXdgSurface() {}
+	virtual ~HaikuXdgSurface();
 	static HaikuXdgSurface *Create(struct HaikuXdgWmBase *client, struct HaikuSurface *surface, uint32_t id);
 	static HaikuXdgSurface *FromResource(struct wl_resource *resource) {return (HaikuXdgSurface*)WlResource::FromResource(resource);}
 
@@ -47,7 +47,6 @@ public:
 	HaikuXdgToplevel *Toplevel() {return fToplevel;}
 	BWindow *Window();
 
-	void HandleDestroy() override;
 	void HandleGetToplevel(uint32_t id) override;
 	void HandleGetPopup(uint32_t id, struct wl_resource *parent, struct wl_resource *positioner) override;
 	void HandleSetWindowGeometry(int32_t x, int32_t y, int32_t width, int32_t height) override;

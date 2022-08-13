@@ -11,6 +11,7 @@ private:
 public:
 	virtual ~WlResource() {}
 	bool Init(struct wl_client *wl_client, uint32_t version, uint32_t id);
+	void Destroy();
 	virtual const struct wl_interface *Interface() const = 0;
 	virtual int Dispatch(uint32_t opcode, const struct wl_message *message, union wl_argument *args);
 	static WlResource *FromResource(struct wl_resource *resource);

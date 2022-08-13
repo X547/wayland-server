@@ -18,6 +18,17 @@ private:
 	
 	int32_t fMinWidth = 0, fMinHeight = 0;
 	int32_t fMaxWidth = INT32_MAX, fMaxHeight = INT32_MAX;
+	int32_t fWidth = 0;
+	int32_t fHeight = 0;
+	union {
+		struct {
+			uint32_t maximized: 1;
+			uint32_t fullscreen: 1;
+			uint32_t resizing: 1;
+			uint32_t activated: 1;
+		};
+		uint32_t val;
+	} fState {};
 
 public:
 	virtual ~HaikuXdgToplevel();
@@ -28,8 +39,8 @@ public:
 	BWindow *Window() {return (BWindow*)fWindow;}
 	void MinSize(int32_t &width, int32_t &height) {width = fMinWidth; height = fMinHeight;}
 	void MaxSize(int32_t &width, int32_t &height) {width = fMaxWidth; height = fMaxHeight;}
+	void DoSendConfigure();
 
-	void HandleDestroy() override;
 	void HandleSetParent(struct wl_resource *parent) override;
 	void HandleSetTitle(const char *title) override;
 	void HandleSetAppId(const char *app_id) override;

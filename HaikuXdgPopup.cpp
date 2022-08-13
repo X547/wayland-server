@@ -116,11 +116,6 @@ HaikuXdgPopup::~HaikuXdgPopup()
 	}
 }
 
-void HaikuXdgPopup::HandleDestroy()
-{
-	wl_resource_destroy(ToResource());
-}
-
 void HaikuXdgPopup::HandleGrab(struct wl_resource *seat, uint32_t serial)
 {
 }

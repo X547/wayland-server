@@ -170,13 +170,6 @@ void HaikuPointer::HandleRelease()
 }
 
 
-//#pragma mark - HaikuKeyboard
-
-void HaikuKeyboard::HandleRelease()
-{
-}
-
-
 //#pragma mark - HaikuSeat
 
 struct wl_global *HaikuSeat::CreateGlobal(struct wl_display *display)
@@ -232,7 +225,7 @@ void HaikuSeat::SetKeyboardFocus(HaikuSurface *surface, bool setFocus)
 				fKeyboard->SendLeave(NextSerial(), fKeyboardFocus->ToResource());
 			}
 			fKeyboardFocus = surface;
-			static struct wl_array keys{};
+			struct wl_array keys{};
 			fKeyboard->SendEnter(NextSerial(), surface->ToResource(), &keys);
 		}
 	} else if (fKeyboardFocus == surface) {
@@ -389,7 +382,7 @@ bool HaikuSeat::MessageReceived(HaikuSurface *surface, BMessage *msg)
 							if (!xdgSurface->SetConfigurePending()) true;
 							
 							fPointerFocus->View()->Window()->MoveBy(where.x - fTrack.origin.x, where.y - fTrack.origin.y);
-							static struct wl_array array{};
+							struct wl_array array{};
 							xdgSurface->Toplevel()->SendConfigure(fTrack.wndWidth - (where.x - fTrack.origin.x), fTrack.wndHeight - (where.y - fTrack.origin.y), &array);
 							fTrack.wndWidth -= where.x - fTrack.origin.x;
 							fTrack.wndHeight -= where.y - fTrack.origin.y;
@@ -409,7 +402,7 @@ bool HaikuSeat::MessageReceived(HaikuSurface *surface, BMessage *msg)
 							if (maxHeight == 0) maxHeight = INT32_MAX;
 							int32_t newWidth = std::min<int32_t>(std::max<int32_t>(fTrack.wndWidth + (where.x - fTrack.origin.x), minWidth), maxWidth);
 							int32_t newHeight = std::min<int32_t>(std::max<int32_t>(fTrack.wndHeight + (where.y - fTrack.origin.y), minHeight), maxHeight);
-							static struct wl_array array{};
+							struct wl_array array{};
 							xdgSurface->Toplevel()->SendConfigure(newWidth, newHeight, &array);
 							xdgSurface->SendConfigure(xdgSurface->NextSerial());
 						}
@@ -454,10 +447,6 @@ void HaikuSeat::HandleGetKeyboard(uint32_t id)
 void HaikuSeat::HandleGetTouch(uint32_t id)
 {
 	abort();
-}
-
-void HaikuSeat::HandleRelease()
-{
 }
 
 

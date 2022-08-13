@@ -58,11 +58,6 @@ HaikuServerDecoration *HaikuServerDecoration::Create(HaikuServerDecorationManage
 	return serverDecor;
 }
 
-void HaikuServerDecoration::HandleRelease()
-{
-	wl_resource_destroy(ToResource());
-}
-
 window_look HaikuServerDecoration::Look()
 {
 	switch (fMode) {

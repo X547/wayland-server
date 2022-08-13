@@ -30,6 +30,5 @@ public:
 	inline OrgKdeKwinServerDecoration::Mode Mode() {return fMode;}
 	window_look Look();
 
-	void HandleRelease() final;
 	void HandleRequestMode(uint32_t mode) final;
 };

@@ -8,6 +8,4 @@ private:
 
 public:
 	static struct wl_global *CreateGlobal(struct wl_display *display);
-
-	void HandleRelease() final;
 };

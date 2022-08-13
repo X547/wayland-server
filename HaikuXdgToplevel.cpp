@@ -28,7 +28,8 @@ public:
 	HaikuXdgToplevel *Toplevel() {return fToplevel;}
 
 	bool QuitRequested() final;
-	void FrameResized(float newWidth, float newHeight);
+	void WindowActivated(bool isActive) final;
+	void FrameResized(float newWidth, float newHeight) final;
 };
 
 WaylandWindow::WaylandWindow(HaikuXdgToplevel *toplevel, BRect frame, const char* title, window_look look, window_feel feel, uint32 flags, uint32 workspace):
@@ -46,6 +47,16 @@ bool WaylandWindow::QuitRequested()
 	return false;
 }
 
+void WaylandWindow::WindowActivated(bool isActive)
+{
+	WaylandEnv vlEnv(this);
+	if (isActive != fToplevel->fState.activated) {
+		fToplevel->fState.activated = !fToplevel->fState.activated;
+		fToplevel->DoSendConfigure();
+		fToplevel->XdgSurface()->SendConfigure(fToplevel->XdgSurface()->NextSerial());
+	}
+}
+
 void WaylandWindow::FrameResized(float newWidth, float newHeight)
 {
 	WaylandEnv vlEnv(this);
@@ -59,17 +70,31 @@ void WaylandWindow::FrameResized(float newWidth, float newHeight)
 	//if (fToplevel->fResizePending) return;
 	//fToplevel->fResizePending = true;
 
-	static struct wl_array array{};
+	struct wl_array array{};
 	fToplevel->SendConfigure((int32_t)newWidth + 1, (int32_t)newHeight + 1, &array);
 	fToplevel->XdgSurface()->SendConfigure(fToplevel->XdgSurface()->NextSerial());
 }
 
 
-//#pragma mark - xdg_toplevel
+//#pragma mark - HaikuXdgToplevel
 
-void HaikuXdgToplevel::HandleDestroy()
+void HaikuXdgToplevel::DoSendConfigure()
 {
-	wl_resource_destroy(ToResource());
+	uint32_t stateArray[4];
+	struct wl_array state {
+		.size = 0,
+		.alloc = sizeof(stateArray),
+		.data = &stateArray[0]
+	};
+	uint32_t *p = (uint32_t*)state.data;
+
+	if (fState.maximized ) {*p++ = XdgToplevel::stateMaximized;}
+	if (fState.fullscreen) {*p++ = XdgToplevel::stateFullscreen;}
+	if (fState.resizing  ) {*p++ = XdgToplevel::stateResizing;}
+	if (fState.activated ) {*p++ = XdgToplevel::stateActivated;}
+
+	state.size = (uint8_t*)p - (uint8_t*)state.data;
+	SendConfigure(fWidth, fHeight, &state);
 }
 
 void HaikuXdgToplevel::HandleSetParent(struct wl_resource *parent)

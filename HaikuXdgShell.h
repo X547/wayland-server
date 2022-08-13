@@ -22,7 +22,6 @@ public:
 	virtual ~HaikuXdgWmBase();
 	static HaikuXdgWmBase *FromResource(struct wl_resource *resource) {return (HaikuXdgWmBase*)WlResource::FromResource(resource);}
 
-	void HandleDestroy() override;
 	void HandleCreatePositioner(uint32_t id) override;
 	void HandleGetXdgSurface(uint32_t id, struct wl_resource *surface) override;
 	void HandlePong(uint32_t serial) override;

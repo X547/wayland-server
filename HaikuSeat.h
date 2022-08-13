@@ -16,8 +16,6 @@ public:
 };
 
 class HaikuKeyboard: public WlKeyboard {
-public:
-	void HandleRelease() final;
 };
 
 class HaikuSeat: public WlSeat {
@@ -62,7 +60,6 @@ public:
 	void HandleGetPointer(uint32_t id) final;
 	void HandleGetKeyboard(uint32_t id) final;
 	void HandleGetTouch(uint32_t id) final;
-	void HandleRelease() final;
 };
 
 

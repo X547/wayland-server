@@ -35,15 +35,9 @@ private:
 public:
 	virtual ~HaikuRegion() {}
 
-	void HandleDestroy() final;
 	void HandleAdd(int32_t x, int32_t y, int32_t width, int32_t height) final;
 	void HandleSubtract(int32_t x, int32_t y, int32_t width, int32_t height) final;
 };
-
-void HaikuRegion::HandleDestroy()
-{
-	wl_resource_destroy(ToResource());
-}
 
 void HaikuRegion::HandleAdd(int32_t x, int32_t y, int32_t width, int32_t height)
 {
@@ -198,11 +192,6 @@ void HaikuSurface::SetHook(Hook *hook)
 	fHook.SetTo(hook);
 }
 
-
-void HaikuSurface::HandleDestroy()
-{
-	wl_resource_destroy(ToResource());
-}
 
 void HaikuSurface::HandleAttach(struct wl_resource *buffer_resource, int32_t dx, int32_t dy)
 {

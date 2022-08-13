@@ -33,8 +33,3 @@ void HaikuOutput::Bind(struct wl_client *wl_client, void *data, uint32_t version
 	output->SendScale(1);
 	output->SendDone();
 }
-
-void HaikuOutput::HandleRelease()
-{
-	wl_resource_destroy(ToResource());
-}
