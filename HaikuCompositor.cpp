@@ -50,7 +50,7 @@ void HaikuRegion::HandleSubtract(int32_t x, int32_t y, int32_t width, int32_t he
 }
 
 
-//#pragma mark - compositor
+//#pragma mark - HaikuCompositor
 
 struct wl_global *HaikuCompositor::CreateGlobal(struct wl_display *display)
 {
@@ -151,7 +151,6 @@ HaikuSurface *HaikuSurface::Create(struct wl_client *client, uint32_t version, u
 	if (!surface->Init(client, version, id)) {
 		return NULL;
 	}
-	surface->fClient = client;
 	return surface;
 }
 
@@ -208,9 +207,9 @@ void HaikuSurface::HandleDamage(int32_t x, int32_t y, int32_t width, int32_t hei
 
 void HaikuSurface::HandleFrame(uint32_t callback_id)
 {
-	fCallback = wl_resource_create(fClient, &wl_callback_interface, 1, callback_id);
+	fCallback = wl_resource_create(Client(), &wl_callback_interface, 1, callback_id);
 	if (fCallback == NULL) {
-		wl_client_post_no_memory(fClient);
+		wl_client_post_no_memory(Client());
 		return;
 	}
 }

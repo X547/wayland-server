@@ -1,5 +1,6 @@
 #include "Wayland.h"
 #include "HaikuCompositor.h"
+#include "HaikuSubcompositor.h"
 #include "HaikuXdgShell.h"
 #include "HaikuXdgSurface.h"
 #include "HaikuXdgToplevel.h"
@@ -101,6 +102,7 @@ extern "C" _EXPORT int wl_ips_client_connected(void **clientOut, void *clientDis
 
 	Assert(wl_display_init_shm(display) == 0);
 	Assert(HaikuCompositor::CreateGlobal(display) != NULL);
+	Assert(HaikuSubcompositor::CreateGlobal(display) != NULL);
 	Assert(HaikuOutput::CreateGlobal(display) != NULL);
 	Assert(HaikuDataDeviceManager::CreateGlobal(display) != NULL);
 	Assert(HaikuSeat::CreateGlobal(display) != NULL);

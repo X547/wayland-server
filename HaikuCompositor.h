@@ -57,7 +57,6 @@ private:
 		int32_t scale = 1;
 	};
 
-	struct wl_client *fClient;
 	ObjectDeleter<Hook> fHook;
 
 	State fState;

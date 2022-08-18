@@ -71,7 +71,7 @@ static uint32_t FromHaikuKeyCode(uint32 haikuKey)
 		case 0x30: wlKey = KEY_P; break;	
 		case 0x31: wlKey = KEY_LEFTBRACE; break;
 		case 0x32: wlKey = KEY_RIGHTBRACE; break;
-		//case 0x33: wlKey = VK_OEM_6; break;
+		case 0x33: wlKey = KEY_BACKSLASH; break;
 		case 0x34: wlKey = KEY_DELETE; break;
 	
 		case 0x3b: wlKey = KEY_CAPSLOCK; break;	
@@ -84,8 +84,8 @@ static uint32_t FromHaikuKeyCode(uint32 haikuKey)
 		case 0x42: wlKey = KEY_J; break;
 		case 0x43: wlKey = KEY_K; break;
 		case 0x44: wlKey = KEY_L; break;
-		//case 0x45: wlKey = VK_OEM_PLUS; break;
-		//case 0x46: wlKey = VK_OEM_1; break;
+		case 0x45: wlKey = KEY_SEMICOLON; break;
+		case 0x46: wlKey = KEY_APOSTROPHE; break;
 		case 0x47: wlKey = KEY_ENTER; break;
 
 		case 0x4b: wlKey = KEY_LEFTSHIFT; break;	
@@ -102,10 +102,12 @@ static uint32_t FromHaikuKeyCode(uint32 haikuKey)
 		case 0x56: wlKey = KEY_RIGHTSHIFT; break;	
 		case 0x57: wlKey = KEY_UP; break;
 
-		//case 0x5c: wlKey = VK_LCONTROL; break;
-		//case 0x5d: wlKey = VK_LMENU; break;
+		case 0x5c: wlKey = KEY_LEFTCTRL; break;
+		case 0x5d: wlKey = KEY_LEFTALT; break;
 		case 0x5e: wlKey = KEY_SPACE; break;
+		case 0x5f: wlKey = KEY_RIGHTALT; break;
 
+		case 0x60: wlKey = KEY_RIGHTCTRL; break;
 		case 0x61: wlKey = KEY_LEFT; break;
 		case 0x62: wlKey = KEY_DOWN; break;
 		case 0x63: wlKey = KEY_RIGHT; break;
@@ -113,10 +115,12 @@ static uint32_t FromHaikuKeyCode(uint32 haikuKey)
 		//case 0x66: wlKey = VK_LWIN; break;
 		//case 0x68: wlKey = VK_APPS; break;
 
-		//case 0x6a: wlKey = VK_OEM_5; break;
-		//case 0x6b: wlKey = VK_OEM_102; break;
+		case 0x6a: wlKey = KEY_RO; break;
+		case 0x6b: wlKey = KEY_102ND; break;
 
-		default: wlKey = 0;
+		default:
+			fprintf(stderr, "[!] unknown key: %#x\n", haikuKey);
+			wlKey = 0;
 	}
 	return wlKey;
 }
@@ -286,15 +290,19 @@ bool HaikuSeat::MessageReceived(HaikuSurface *surface, BMessage *msg)
 		}
 		case B_MOUSE_WHEEL_CHANGED: {
 			if (fPointer == NULL || fPointerFocus != surface) return false;
+			bigtime_t when;
 			float dx, dy;
+			if (msg->FindInt64("when", &when) < B_OK) when = system_time();
 			if (msg->FindFloat("be:wheel_delta_x", &dx) < B_OK) dx = 0;
 			if (msg->FindFloat("be:wheel_delta_y", &dy) < B_OK) dy = 0;
 			if (dx != 0) {
 				fPointer->SendAxisSource(WlPointer::axisSourceWheel);
+				fPointer->SendAxis(when/1000, WlPointer::axisHorizontalScroll, wl_fixed_from_double(dx*10.0));
 				fPointer->SendAxisDiscrete(WlPointer::axisHorizontalScroll, dx);
 			}
 			if (dy != 0) {
 				fPointer->SendAxisSource(WlPointer::axisSourceWheel);
+				fPointer->SendAxis(when/1000, WlPointer::axisVerticalScroll, wl_fixed_from_double(dy*10.0));
 				fPointer->SendAxisDiscrete(WlPointer::axisVerticalScroll, dy);
 			}
 			fPointer->SendFrame();
