@@ -2,7 +2,7 @@
 #include "HaikuCompositor.h"
 #include "HaikuXdgSurface.h"
 #include "HaikuXdgToplevel.h"
-#include "input-event-codes.h"
+#include "WaylandKeycodes.h"
 #include <SupportDefs.h>
 #include <Application.h>
 #include <Window.h>

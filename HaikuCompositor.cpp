@@ -8,7 +8,6 @@
 #include <wayland-server-core.h>
 #include <wayland-server-protocol.h>
 #include <stdio.h>
-#include "input-event-codes.h"
 
 #include "AppKitPtrs.h"
 #include <Application.h>
