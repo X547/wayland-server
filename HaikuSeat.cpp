@@ -139,6 +139,15 @@ static uint32_t FromHaikuMouseBtnCode(uint32 haikuBtn)
 	return wlBtn;
 }
 
+static uint32_t FromHaikuModifiers(uint32 haikuModifiers)
+{
+	uint32_t wlModifiers = 0;
+	if (B_SHIFT_KEY   & haikuModifiers) wlModifiers |= (1 << 0);
+	if (B_CONTROL_KEY & haikuModifiers) wlModifiers |= (1 << 2);
+	if (B_COMMAND_KEY & haikuModifiers) wlModifiers |= (1 << 3) | (1 << 18);
+	return wlModifiers;
+}
+
 class SurfaceCursorHook: public HaikuSurface::Hook {
 public:
 	BPoint fHotspot;
@@ -286,6 +295,13 @@ bool HaikuSeat::MessageReceived(HaikuSurface *surface, BMessage *msg)
 
 			uint32_t wlKey = FromHaikuKeyCode(key);
 			fKeyboard->SendKey(NextSerial(), system_time()/1000, wlKey, state);
+			return true;
+		}
+		case B_MODIFIERS_CHANGED: {
+			if (fKeyboard == NULL || fKeyboardFocus != surface) return false;
+			uint32 modifiers;
+			if (msg->FindInt32("modifiers", (int32*)&modifiers) < B_OK) modifiers = 0;
+			fKeyboard->SendModifiers(NextSerial(), FromHaikuModifiers(modifiers), 0, 0, 0);
 			return true;
 		}
 		case B_MOUSE_WHEEL_CHANGED: {
