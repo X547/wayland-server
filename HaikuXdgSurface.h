@@ -11,6 +11,7 @@ class HaikuXdgSurface: public XdgSurface {
 public:
 	struct GeometryInfo {
 		bool valid;
+		bool changed;
 		int32_t x;
 		int32_t y;
 		int32_t width;

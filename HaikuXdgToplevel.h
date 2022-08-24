@@ -11,13 +11,14 @@ private:
 	friend class HaikuSurface;
 	friend class HaikuXdgSurface;
 	friend class WaylandWindow;
+	friend class XdgSurfaceHook;
 
 	HaikuXdgSurface *fXdgSurface{};
 	WaylandWindow *fWindow{};
-	bool fResizePending = false;
-	
+
+	bool fSizeLimitsDirty = false;
 	int32_t fMinWidth = 0, fMinHeight = 0;
-	int32_t fMaxWidth = INT32_MAX, fMaxHeight = INT32_MAX;
+	int32_t fMaxWidth = 0, fMaxHeight = 0;
 	int32_t fWidth = 0;
 	int32_t fHeight = 0;
 	union {
@@ -29,6 +30,9 @@ private:
 		};
 		uint32_t val;
 	} fState {};
+
+	uint32_t fResizeSerial = 0;
+	bool fSizeChanged = false;
 
 public:
 	virtual ~HaikuXdgToplevel();

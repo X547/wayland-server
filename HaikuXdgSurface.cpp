@@ -37,7 +37,6 @@ void XdgSurfaceHook::HandleCommit()
 		auto viewLocked = AppKitPtrs::LockedPtr(Base()->View());
 		if (bitmap != NULL) {
 			viewLocked->ResizeTo(bitmap->Bounds().Width(), bitmap->Bounds().Height());
-		} else {
 		}
 		Base()->Invalidate();
 	}
@@ -56,10 +55,40 @@ void XdgSurfaceHook::HandleCommit()
 		fXdgSurface->SendConfigure(fXdgSurface->NextSerial());
 	}
 
-	if (fXdgSurface->Surface()->Bitmap() != NULL) {
-		BSize oldSize = fXdgSurface->Window()->Size();
+	if (fXdgSurface->fToplevel != NULL && fXdgSurface->fToplevel->fSizeLimitsDirty) {
+		fXdgSurface->Window()->SetSizeLimits(
+			fXdgSurface->fToplevel->fMinWidth  == 0 ? 0     : fXdgSurface->fToplevel->fMinWidth  - 1,
+			fXdgSurface->fToplevel->fMaxWidth  == 0 ? 32768 : fXdgSurface->fToplevel->fMaxWidth  - 1,
+			fXdgSurface->fToplevel->fMinHeight == 0 ? 0     : fXdgSurface->fToplevel->fMinHeight - 1,
+			fXdgSurface->fToplevel->fMaxHeight == 0 ? 32768 : fXdgSurface->fToplevel->fMaxHeight - 1
+		);
+		if (
+			fXdgSurface->fToplevel->fMinWidth != 0 && fXdgSurface->fToplevel->fMinWidth == fXdgSurface->fToplevel->fMaxWidth &&
+			fXdgSurface->fToplevel->fMinHeight != 0 && fXdgSurface->fToplevel->fMinHeight == fXdgSurface->fToplevel->fMaxHeight
+		) {
+			fXdgSurface->Window()->SetFlags(fXdgSurface->Window()->Flags() | B_NOT_RESIZABLE);
+		} else {
+			fXdgSurface->Window()->SetFlags(fXdgSurface->Window()->Flags() & ~B_NOT_RESIZABLE);
+		}
+		fXdgSurface->fToplevel->fSizeLimitsDirty = false;
+	}
+
+	if (fXdgSurface->fToplevel != NULL && (int32_t)fXdgSurface->fToplevel->fResizeSerial - (int32_t)(int32_t)fXdgSurface->fAckSerial > 0) {
+	} else if (fXdgSurface->fGeometry.changed) {
+		fXdgSurface->fGeometry.changed = false;
+		BSize oldSize;
+		if (fXdgSurface->fToplevel != NULL) {
+			oldSize.width = fXdgSurface->fToplevel->fWidth - 1;
+			oldSize.height = fXdgSurface->fToplevel->fHeight - 1;
+		} else {
+			oldSize = fXdgSurface->Window()->Size();
+		}
 		BSize newSize = oldSize;
-		if (fXdgSurface->Geometry().valid && fXdgSurface->Surface()->ServerDecoration() != NULL && fXdgSurface->Surface()->ServerDecoration()->Mode() == OrgKdeKwinServerDecoration::modeServer) {
+		if (
+			fXdgSurface->Geometry().valid &&
+			fXdgSurface->Surface()->ServerDecoration() != NULL &&
+			fXdgSurface->Surface()->ServerDecoration()->Mode() == OrgKdeKwinServerDecoration::modeServer
+		) {
 			if (fXdgSurface->Surface()->View() != NULL)
 				AppKitPtrs::LockedPtr(fXdgSurface->Surface()->View())->MoveTo(-fXdgSurface->Geometry().x, -fXdgSurface->Geometry().y);
 			newSize.width = fXdgSurface->Geometry().width - 1;
@@ -67,8 +96,14 @@ void XdgSurfaceHook::HandleCommit()
 		} else {
 			newSize = fXdgSurface->Surface()->Bitmap()->Bounds().Size();
 		}
-		if (oldSize != newSize)
+		if (oldSize != newSize) {
+			if (fXdgSurface->fToplevel != NULL) {
+				fXdgSurface->fToplevel->fSizeChanged = true;
+				fXdgSurface->fToplevel->fWidth = (int32_t)newSize.width + 1;
+				fXdgSurface->fToplevel->fHeight = (int32_t)newSize.width + 1;
+			}
 			fXdgSurface->Window()->ResizeTo(newSize.width, newSize.height);
+		}
 	}
 	if (!fXdgSurface->fSurfaceInitalized && fXdgSurface->Surface()->Bitmap() != NULL) {
 		if (fXdgSurface->Surface()->ServerDecoration() != NULL) {
@@ -121,6 +156,7 @@ void HaikuXdgSurface::HandleGetPopup(uint32_t id, struct wl_resource *parent, st
 void HaikuXdgSurface::HandleSetWindowGeometry(int32_t x, int32_t y, int32_t width, int32_t height)
 {
 	fGeometry.valid = true;
+	fGeometry.changed = true;
 	fGeometry.x = x;
 	fGeometry.y = y;
 	fGeometry.width = width;

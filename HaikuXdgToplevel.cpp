@@ -60,6 +60,12 @@ void WaylandWindow::WindowActivated(bool isActive)
 void WaylandWindow::FrameResized(float newWidth, float newHeight)
 {
 	WaylandEnv vlEnv(this);
+
+	if (fToplevel->fSizeChanged) {
+		fToplevel->fSizeChanged = false;
+		return;
+	}
+
 	if(!(
 		fToplevel->XdgSurface()->Geometry().valid &&
 		fToplevel->XdgSurface()->Surface()->ServerDecoration() != NULL &&
@@ -67,12 +73,16 @@ void WaylandWindow::FrameResized(float newWidth, float newHeight)
 	))
 		return;
 
-	//if (fToplevel->fResizePending) return;
-	//fToplevel->fResizePending = true;
+	if ((int32_t)newWidth + 1 == fToplevel->fWidth && (int32_t)newHeight + 1 == fToplevel->fHeight) {
+		return;
+	}
+	fToplevel->fWidth = (int32_t)newWidth + 1;
+	fToplevel->fHeight = (int32_t)newHeight + 1;
 
-	struct wl_array array{};
-	fToplevel->SendConfigure((int32_t)newWidth + 1, (int32_t)newHeight + 1, &array);
-	fToplevel->XdgSurface()->SendConfigure(fToplevel->XdgSurface()->NextSerial());
+	fToplevel->fResizeSerial = fToplevel->XdgSurface()->NextSerial();
+
+	fToplevel->DoSendConfigure();
+	fToplevel->XdgSurface()->SendConfigure(fToplevel->fResizeSerial);
 }
 
 
@@ -128,12 +138,14 @@ void HaikuXdgToplevel::HandleResize(struct wl_resource *_seat, uint32_t serial, 
 
 void HaikuXdgToplevel::HandleSetMaxSize(int32_t width, int32_t height)
 {
+	fSizeLimitsDirty = true;
 	fMaxWidth = width;
 	fMaxHeight = height;
 }
 
 void HaikuXdgToplevel::HandleSetMinSize(int32_t width, int32_t height)
 {
+	fSizeLimitsDirty = true;
 	fMinWidth = width;
 	fMinHeight = height;
 }
