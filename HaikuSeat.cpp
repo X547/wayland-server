@@ -40,9 +40,10 @@ static uint32_t FromHaikuKeyCode(uint32 haikuKey)
 		case 0x0b: wlKey = KEY_F10; break;
 		case 0x0c: wlKey = KEY_F11; break;
 		case 0x0d: wlKey = KEY_F12; break;
-		//case 0x0e: vkey = VK_SNAPSHOT; break;
+		case 0x0e: wlKey = KEY_SYSRQ; break;
 		case 0x0f: wlKey = KEY_SCROLLLOCK; break;
-
+		case 0x10: wlKey = KEY_PAUSE; break;
+		case 0x11: wlKey = KEY_GRAVE; break;
 		case 0x12: wlKey = KEY_1; break;
 		case 0x13: wlKey = KEY_2; break;
 		case 0x14: wlKey = KEY_3; break;
@@ -57,7 +58,12 @@ static uint32_t FromHaikuKeyCode(uint32 haikuKey)
 		case 0x1d: wlKey = KEY_EQUAL; break;
 		case 0x1e: wlKey = KEY_BACKSPACE; break;
 		case 0x1f: wlKey = KEY_INSERT; break;
-
+		case 0x20: wlKey = KEY_HOME; break;
+		case 0x21: wlKey = KEY_PAGEUP; break;
+		case 0x22: wlKey = KEY_NUMLOCK; break;
+		case 0x23: wlKey = KEY_KPSLASH; break;
+		case 0x24: wlKey = KEY_KPASTERISK; break;
+		case 0x25: wlKey = KEY_KPMINUS; break;
 		case 0x26: wlKey = KEY_TAB; break;
 		case 0x27: wlKey = KEY_Q; break;
 		case 0x28: wlKey = KEY_W; break;
@@ -73,7 +79,12 @@ static uint32_t FromHaikuKeyCode(uint32 haikuKey)
 		case 0x32: wlKey = KEY_RIGHTBRACE; break;
 		case 0x33: wlKey = KEY_BACKSLASH; break;
 		case 0x34: wlKey = KEY_DELETE; break;
-	
+		case 0x35: wlKey = KEY_END; break;
+		case 0x36: wlKey = KEY_PAGEDOWN; break;
+		case 0x37: wlKey = KEY_KP7; break;
+		case 0x38: wlKey = KEY_KP8; break;
+		case 0x39: wlKey = KEY_KP9; break;
+		case 0x3a: wlKey = KEY_KPPLUS; break;
 		case 0x3b: wlKey = KEY_CAPSLOCK; break;	
 		case 0x3c: wlKey = KEY_A; break;
 		case 0x3d: wlKey = KEY_S; break;
@@ -87,7 +98,9 @@ static uint32_t FromHaikuKeyCode(uint32 haikuKey)
 		case 0x45: wlKey = KEY_SEMICOLON; break;
 		case 0x46: wlKey = KEY_APOSTROPHE; break;
 		case 0x47: wlKey = KEY_ENTER; break;
-
+		case 0x48: wlKey = KEY_KP4; break;
+		case 0x49: wlKey = KEY_KP5; break;
+		case 0x4a: wlKey = KEY_KP6; break;
 		case 0x4b: wlKey = KEY_LEFTSHIFT; break;	
 		case 0x4c: wlKey = KEY_Z; break;
 		case 0x4d: wlKey = KEY_X; break;
@@ -101,20 +114,24 @@ static uint32_t FromHaikuKeyCode(uint32 haikuKey)
 		case 0x55: wlKey = KEY_SLASH; break;
 		case 0x56: wlKey = KEY_RIGHTSHIFT; break;	
 		case 0x57: wlKey = KEY_UP; break;
-
+		case 0x58: wlKey = KEY_KP1; break;
+		case 0x59: wlKey = KEY_KP2; break;
+		case 0x5a: wlKey = KEY_KP3; break;
+		case 0x5b: wlKey = KEY_KPENTER; break;
 		case 0x5c: wlKey = KEY_LEFTCTRL; break;
 		case 0x5d: wlKey = KEY_LEFTALT; break;
 		case 0x5e: wlKey = KEY_SPACE; break;
 		case 0x5f: wlKey = KEY_RIGHTALT; break;
-
 		case 0x60: wlKey = KEY_RIGHTCTRL; break;
 		case 0x61: wlKey = KEY_LEFT; break;
 		case 0x62: wlKey = KEY_DOWN; break;
 		case 0x63: wlKey = KEY_RIGHT; break;
-
+		case 0x64: wlKey = KEY_KP0; break;
+		case 0x65: wlKey = KEY_KPDOT; break;
 		//case 0x66: wlKey = VK_LWIN; break;
+		//case 0x67: wlKey = VK_RWIN; break;
 		//case 0x68: wlKey = VK_APPS; break;
-
+		//case 0x69: wlKey = 0; break;
 		case 0x6a: wlKey = KEY_RO; break;
 		case 0x6b: wlKey = KEY_102ND; break;
 
