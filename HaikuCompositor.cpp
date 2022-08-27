@@ -1,4 +1,5 @@
 #include "HaikuCompositor.h"
+#include "HaikuSubcompositor.h"
 #include "HaikuXdgSurface.h"
 #include "HaikuXdgToplevel.h"
 #include "HaikuXdgPopup.h"
@@ -33,6 +34,9 @@ private:
 
 public:
 	virtual ~HaikuRegion() {}
+	static HaikuRegion *FromResource(struct wl_resource *resource) {return (HaikuRegion*)WlResource::FromResource(resource);}
+
+	const BRegion &Region() {return fRegion;}
 
 	void HandleAdd(int32_t x, int32_t y, int32_t width, int32_t height) final;
 	void HandleSubtract(int32_t x, int32_t y, int32_t width, int32_t height) final;
@@ -94,7 +98,7 @@ private:
 	uint32 fOldMouseBtns = 0;
 
 public:
-	WaylandView(HaikuSurface *surface, BRect frame, const char* name, uint32 resizingMode, uint32 flags);
+	WaylandView(HaikuSurface *surface);
 	virtual ~WaylandView() {}
 
 	HaikuSurface *Surface() {return fSurface;}
@@ -105,10 +109,12 @@ public:
 };
 
 
-WaylandView::WaylandView(HaikuSurface *surface, BRect frame, const char* name, uint32 resizingMode, uint32 flags):
-	BView(frame, name, resizingMode, flags),
+WaylandView::WaylandView(HaikuSurface *surface):
+	BView(BRect(), "WaylandView", B_FOLLOW_NONE, B_WILL_DRAW | B_TRANSPARENT_BACKGROUND),
 	fSurface(surface)
 {
+	SetDrawingMode(B_OP_ALPHA);
+	SetViewColor(B_TRANSPARENT_COLOR);
 }
 
 void WaylandView::WindowActivated(bool active)
@@ -172,10 +178,24 @@ HaikuSurface::~HaikuSurface()
 
 void HaikuSurface::AttachWindow(BWindow *window)
 {
-	fView = new WaylandView(this, BRect(), "WaylandView", B_FOLLOW_NONE, B_WILL_DRAW);
-	fView->SetDrawingMode(B_OP_ALPHA);
+	fView = new WaylandView(this);
 	window->AddChild(fView);
 	fView->MakeFocus();
+}
+
+void HaikuSurface::AttachView(BView *view)
+{
+	fView = new WaylandView(this);
+	view->AddChild(fView);
+}
+
+void HaikuSurface::Detach()
+{
+	fView->LockLooper();
+	BLooper *looper = fView->Looper();
+	fView->RemoveSelf();
+	looper->Unlock();
+	fView = NULL;
 }
 
 void HaikuSurface::Invalidate()
@@ -197,6 +217,7 @@ void HaikuSurface::HandleAttach(struct wl_resource *buffer_resource, int32_t dx,
 	fPendingState.buffer = buffer_resource; // TODO: handle delete
 	fPendingState.dx = dx;
 	fPendingState.dy = dy;
+	fBufferAttached = true;
 }
 
 void HaikuSurface::HandleDamage(int32_t x, int32_t y, int32_t width, int32_t height)
@@ -215,10 +236,14 @@ void HaikuSurface::HandleFrame(uint32_t callback_id)
 
 void HaikuSurface::HandleSetOpaqueRegion(struct wl_resource *region_resource)
 {
+	fState.valid.opaqueRgn = region_resource != NULL;
+	fState.opaqueRgn = region_resource == NULL ? BRegion() : HaikuRegion::FromResource(region_resource)->Region();
 }
 
 void HaikuSurface::HandleSetInputRegion(struct wl_resource *region_resource)
 {
+	fState.valid.inputRgn = region_resource != NULL;
+	fState.inputRgn = region_resource == NULL ? BRegion() : HaikuRegion::FromResource(region_resource)->Region();
 }
 
 void HaikuSurface::HandleCommit()
@@ -228,25 +253,28 @@ void HaikuSurface::HandleCommit()
 	struct wl_resource *oldBuffer = fState.buffer;
 	fState = fPendingState;
 /*
-	if (oldBuffer != NULL) {
+	if (oldBuffer != NULL && oldBuffer != fState.buffer) {
 		wl_buffer_send_release(oldBuffer);
 	}
 */
-	struct wl_shm_buffer *shmBuffer = fState.buffer == NULL ? NULL : wl_shm_buffer_get(fState.buffer);
 
-	if (shmBuffer != NULL) {
-		fBuffer = {
-			.stride = wl_shm_buffer_get_stride(shmBuffer),
-			.data = wl_shm_buffer_get_data(shmBuffer),
-			.format = wl_shm_buffer_get_format(shmBuffer),
-			.width = wl_shm_buffer_get_width(shmBuffer),
-			.height = wl_shm_buffer_get_height(shmBuffer)
-		};
+	if (fState.buffer != NULL) {
+		struct wl_shm_buffer *shmBuffer = fState.buffer == NULL ? NULL : wl_shm_buffer_get(fState.buffer);
+		if (fBufferAttached) {
+			fBuffer = {
+				.stride = wl_shm_buffer_get_stride(shmBuffer),
+				.data = wl_shm_buffer_get_data(shmBuffer),
+				.format = wl_shm_buffer_get_format(shmBuffer),
+				.width = wl_shm_buffer_get_width(shmBuffer),
+				.height = wl_shm_buffer_get_height(shmBuffer)
+			};
 
-		fBitmap.SetTo(new BBitmap(BRect(0, 0, fBuffer.width - 1, fBuffer.height - 1), 0, B_RGBA32));
-		fBitmap->ImportBits(fBuffer.data, fBuffer.stride*fBuffer.height, fBuffer.stride, 0, B_RGBA32);
+			fBitmap.SetTo(new BBitmap(BRect(0, 0, fBuffer.width - 1, fBuffer.height - 1), 0, B_RGBA32));
+			fBitmap->ImportBits(fBuffer.data, fBuffer.stride*fBuffer.height, fBuffer.stride, 0, B_RGBA32);
 
-		wl_buffer_send_release(fState.buffer);
+			fBufferAttached = false;
+			wl_buffer_send_release(fState.buffer);
+		}
 	} else {
 		fBuffer = {};
 		fBitmap.Unset();

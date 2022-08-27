@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Wayland.h"
+#include "HaikuSubcompositor.h"
 #include <AutoDeleter.h>
 #include <Point.h>
 #include <Region.h>
@@ -42,6 +43,7 @@ private:
 	friend class HaikuXdgSurface;
 	friend class HaikuXdgToplevel;
 	friend class HaikuServerDecoration;
+	friend class HaikuSubsurface;
 
 	struct Buffer {
 		int32_t stride{};
@@ -51,10 +53,19 @@ private:
 	};
 
 	struct State {
+		union {
+			struct {
+				uint32 opaqueRgn: 1;
+				uint32 inputRgn: 1;
+			};
+			uint32 val;
+		} valid{};
 		struct wl_resource *buffer;
 		int32_t dx = 0, dy = 0;
 		int32_t transform = WlOutput::transformNormal;
 		int32_t scale = 1;
+		BRegion opaqueRgn;
+		BRegion inputRgn;
 	};
 
 	ObjectDeleter<Hook> fHook;
@@ -62,11 +73,16 @@ private:
 	State fState;
 	State fPendingState;
 	Buffer fBuffer;
+	bool fBufferAttached = false;
 	BRegion fDirty;
 	ObjectDeleter<BBitmap> fBitmap;
 	WaylandView *fView;
 	HaikuXdgSurface *fXdgSurface{};
 	HaikuServerDecoration *fServerDecoration{};
+	HaikuSubsurface *fSubsurface{};
+
+	HaikuSubsurface::SurfaceList fSurfaceList;
+	uint8_t fVal[64]; // [!] crash without this on window close after fSurfaceList field is added
 
 	struct wl_resource *fCallback{};
 
@@ -78,8 +94,12 @@ public:
 	BView *View() {return (BView*)fView;}
 	BBitmap *Bitmap() {return fBitmap.Get();}
 	HaikuXdgSurface *XdgSurface() {return fXdgSurface;}
+	HaikuSubsurface *Subsurface() {return fSubsurface;}
 	HaikuServerDecoration *ServerDecoration() {return fServerDecoration;}
+	HaikuSubsurface::SurfaceList &SurfaceList() {return fSurfaceList;}
 	void AttachWindow(BWindow *window);
+	void AttachView(BView *view);
+	void Detach();
 	void Invalidate();
 
 	void SetHook(Hook *hook);
