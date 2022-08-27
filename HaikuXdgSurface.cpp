@@ -100,7 +100,7 @@ void XdgSurfaceHook::HandleCommit()
 			if (fXdgSurface->fToplevel != NULL) {
 				fXdgSurface->fToplevel->fSizeChanged = true;
 				fXdgSurface->fToplevel->fWidth = (int32_t)newSize.width + 1;
-				fXdgSurface->fToplevel->fHeight = (int32_t)newSize.width + 1;
+				fXdgSurface->fToplevel->fHeight = (int32_t)newSize.height + 1;
 			}
 			fXdgSurface->Window()->ResizeTo(newSize.width, newSize.height);
 		}
