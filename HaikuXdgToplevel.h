@@ -1,5 +1,6 @@
 #pragma once
 #include "XdgShell.h"
+#include <Rect.h>
 
 
 struct HaikuXdgSurface;
@@ -21,6 +22,7 @@ private:
 	int32_t fMaxWidth = 0, fMaxHeight = 0;
 	int32_t fWidth = 0;
 	int32_t fHeight = 0;
+	BRect fSavedPos;
 	union {
 		struct {
 			uint32_t maximized: 1;

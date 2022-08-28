@@ -12,6 +12,7 @@
 #include "AppKitPtrs.h"
 
 #include <Window.h>
+#include <Screen.h>
 
 static void Assert(bool cond) {if (!cond) abort();}
 
@@ -160,10 +161,30 @@ void HaikuXdgToplevel::HandleUnsetMaximized()
 
 void HaikuXdgToplevel::HandleSetFullscreen(struct wl_resource *output)
 {
+	if (fState.fullscreen) return;
+	fState.fullscreen = true;
+	fSizeChanged = true;
+	fSavedPos = fWindow->Frame();
+	BRect screenFrame = BScreen(fWindow).Frame();
+	fWindow->MoveTo(screenFrame.LeftTop());
+	fWindow->ResizeTo(screenFrame.Width(), screenFrame.Height());
+	fWidth = (int32_t)screenFrame.Width() + 1;
+	fHeight = (int32_t)screenFrame.Height() + 1;
+	DoSendConfigure();
+	XdgSurface()->SendConfigure(XdgSurface()->NextSerial());
 }
 
 void HaikuXdgToplevel::HandleUnsetFullscreen()
 {
+	if (!fState.fullscreen) return;
+	fState.fullscreen = false;
+	fSizeChanged = true;
+	fWindow->MoveTo(fSavedPos.LeftTop());
+	fWindow->ResizeTo(fSavedPos.Width(), fSavedPos.Height());
+	fWidth = (int32_t)fSavedPos.Width() + 1;
+	fHeight = (int32_t)fSavedPos.Height() + 1;
+	DoSendConfigure();
+	XdgSurface()->SendConfigure(XdgSurface()->NextSerial());
 }
 
 void HaikuXdgToplevel::HandleSetMinimized()
