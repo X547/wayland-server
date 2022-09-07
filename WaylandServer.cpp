@@ -89,7 +89,7 @@ void Application::MessageReceived(BMessage *msg)
 
 //#pragma mark - entry points
 
-extern "C" _EXPORT int wl_ips_client_connected(void **clientOut, void *clientDisplay)
+extern "C" _EXPORT int wl_ips_client_connected(void **clientOut, void *clientDisplay, client_enqueue_proc display_enqueue)
 {
 	new Application();
 	be_app->Run();
@@ -97,7 +97,7 @@ extern "C" _EXPORT int wl_ips_client_connected(void **clientOut, void *clientDis
 	fprintf(stderr, "wl_ips_client_connected\n");
 	struct wl_display *display = wl_display_create();
 	fprintf(stderr, "display: %p\n", display);
-	struct wl_client *client = wl_client_create_ips(display, clientDisplay, (client_enqueue_proc)wl_display_enqueue);
+	struct wl_client *client = wl_client_create_ips(display, clientDisplay, display_enqueue);
 	fprintf(stderr, "client: %p\n", client);
 
 	Assert(wl_display_init_shm(display) == 0);
