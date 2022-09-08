@@ -8,7 +8,6 @@ add_project_arguments('-Wno-unused-variable', language: 'cpp')
 
 cpp = meson.get_compiler('cpp')
 
-wlclientdep    = dependency('wayland-client')
 wlserverdep    = dependency('wayland-server')
 wlprotocolsdep = dependency('wayland-protocols')
 
@@ -113,7 +112,6 @@ shared_library('wayland-server-inproc',
 	dependencies: [
 		cpp.find_library('be'),
 		wlserverdep,
-		wlclientdep,
 	],
 	gnu_symbol_visibility: 'hidden',
 	install : true
