@@ -3,12 +3,12 @@
 #include <set>
 #include <string>
 #include <vector>
-#include <SupportDefs.h>
+#include <Looper.h>
+#include <Handler.h>
 
 
 class HaikuSeat;
 class HaikuDataDevice;
-class BMessage;
 
 class HaikuDataSource: public WlDataSource {
 private:
@@ -27,8 +27,11 @@ public:
 };
 
 class HaikuDataOffer: public WlDataOffer {
+private:
+	BMessage fData;
+
 public:
-	static HaikuDataOffer *Create(HaikuDataDevice *dataDevice);
+	static HaikuDataOffer *Create(HaikuDataDevice *dataDevice, const BMessage &data);
 	static HaikuDataOffer *FromResource(struct wl_resource *resource) {return (HaikuDataOffer*)WlResource::FromResource(resource);}
 
 	void HandleAccept(uint32_t serial, const char *mime_type) final;
@@ -41,10 +44,19 @@ class HaikuDataDevice: public WlDataDevice {
 private:
 	HaikuSeat *fSeat;
 
+	class ClipboardWatcher: public BHandler {
+	public:
+		inline HaikuDataDevice &Base() {return *(HaikuDataDevice*)((char*)this - offsetof(HaikuDataDevice, fClipboardWatcher));}
+
+		ClipboardWatcher();
+		virtual ~ClipboardWatcher() = default;
+		void MessageReceived(BMessage *msg) final;
+	} fClipboardWatcher;
+
 public:
 	static HaikuDataDevice *Create(struct wl_client *client, uint32_t version, uint32_t id, struct wl_resource *seat);
 	static HaikuDataDevice *FromResource(struct wl_resource *resource) {return (HaikuDataDevice*)WlResource::FromResource(resource);}
-	virtual ~HaikuDataDevice() = default;
+	virtual ~HaikuDataDevice();
 
 	void HandleStartDrag(struct wl_resource *source, struct wl_resource *origin, struct wl_resource *icon, uint32_t serial) final;
 	void HandleSetSelection(struct wl_resource *source, uint32_t serial) final;

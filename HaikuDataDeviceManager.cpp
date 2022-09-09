@@ -1,5 +1,7 @@
 #include "HaikuDataDeviceManager.h"
 #include "HaikuSeat.h"
+#include "WaylandServer.h"
+#include "AppKitPtrs.h"
 #include <Screen.h>
 #include <Clipboard.h>
 #include <AutoLocker.h>
@@ -69,7 +71,7 @@ void HaikuDataSource::HandleSetActions(uint32_t dndActions)
 
 //#pragma mark - HaikuDataOffer
 
-HaikuDataOffer *HaikuDataOffer::Create(HaikuDataDevice *dataDevice)
+HaikuDataOffer *HaikuDataOffer::Create(HaikuDataDevice *dataDevice, const BMessage &data)
 {
 	HaikuDataOffer *dataOffer = new(std::nothrow) HaikuDataOffer();
 	if (dataOffer == NULL) {
@@ -79,8 +81,24 @@ HaikuDataOffer *HaikuDataOffer::Create(HaikuDataDevice *dataDevice)
 	if (!dataOffer->Init(dataDevice->Client(), wl_resource_get_version(dataDevice->ToResource()), 0)) {
 		return NULL;
 	}
+
+	dataOffer->fData = data;
+
 	dataDevice->SendDataOffer(dataOffer->ToResource());
-	dataOffer->SendOffer("text/plain");
+
+	char *name;
+	type_code type;
+	int32 count;
+	const void *val;
+	ssize_t size;
+	for (int32 i = 0; data.GetInfo(B_MIME_TYPE, i, &name, &type, &count) == B_OK; i++) {
+			data.FindData(name, B_MIME_TYPE, 0, &val, &size);
+			dataOffer->SendOffer(name);
+			if (strcmp(name, "text/plain") == 0 && !data.HasData("text/plain;charset=utf-8", B_MIME_TYPE)) {
+				dataOffer->SendOffer("text/plain;charset=utf-8");
+			}
+	}
+
 	dataOffer->SendAction(0);
 	dataOffer->SendSourceActions(7);
 	return dataOffer;
@@ -90,11 +108,20 @@ void HaikuDataOffer::HandleAccept(uint32_t serial, const char *mime_type)
 {
 }
 
-void HaikuDataOffer::HandleReceive(const char *mime_type, int32_t fd)
+void HaikuDataOffer::HandleReceive(const char *mimeType, int32_t fd)
 {
-	fprintf(stderr, "HaikuDataOffer::HandleReceive\n");
-	const char buf[] = "This is a test.";
-	write(fd, buf, strlen(buf));
+	if (strcmp(mimeType, "text/plain;charset=utf-8") == 0) {
+		mimeType = "text/plain";
+	}
+	const uint8 *val;
+	ssize_t size;
+	fData.FindData(mimeType, B_MIME_TYPE, 0, (const void**)&val, &size);
+	while (size > 0) {
+		ssize_t sizeWritten = write(fd, val, size);
+		if (sizeWritten < 0) break;
+		val += sizeWritten;
+		size -= sizeWritten;
+	}
 	close(fd);
 }
 
@@ -109,6 +136,27 @@ void HaikuDataOffer::HandleSetActions(uint32_t dnd_actions, uint32_t preferred_a
 
 //#pragma mark - HaikuDataDevice
 
+HaikuDataDevice::ClipboardWatcher::ClipboardWatcher(): BHandler("clipboardWatcher")
+{}
+
+void HaikuDataDevice::ClipboardWatcher::MessageReceived(BMessage *msg)
+{
+	switch (msg->what) {
+	case B_CLIPBOARD_CHANGED: {
+		msg->PrintToStream();
+
+		AutoLocker<BClipboard> clipboard(be_clipboard);
+		if (!clipboard.IsLocked()) return;
+
+		HaikuDataDevice *dataDevice = &Base();
+		HaikuDataOffer *dataOffer = HaikuDataOffer::Create(dataDevice, *be_clipboard->Data());
+		dataDevice->SendSelection(dataOffer->ToResource());
+		return;
+	}
+	}
+	return BHandler::MessageReceived(msg);
+}
+
 
 HaikuDataDevice *HaikuDataDevice::Create(struct wl_client *client, uint32_t version, uint32_t id, struct wl_resource *seat)
 {
@@ -122,7 +170,16 @@ HaikuDataDevice *HaikuDataDevice::Create(struct wl_client *client, uint32_t vers
 	}
 	dataDevice->fSeat = HaikuSeat::FromResource(seat);
 
+	AppKitPtrs::LockedPtr(&gServerHandler)->Looper()->AddHandler(&dataDevice->fClipboardWatcher);
+	be_clipboard->StartWatching(BMessenger(&dataDevice->fClipboardWatcher));
+
 	return dataDevice;
+}
+
+HaikuDataDevice::~HaikuDataDevice()
+{
+	be_clipboard->StopWatching(BMessenger(&fClipboardWatcher));
+	AppKitPtrs::LockedPtr(&gServerHandler)->Looper()->RemoveHandler(&fClipboardWatcher);
 }
 
 void HaikuDataDevice::HandleStartDrag(struct wl_resource *_source, struct wl_resource *_origin, struct wl_resource *_icon, uint32_t serial)
