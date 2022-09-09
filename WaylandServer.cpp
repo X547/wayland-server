@@ -1,3 +1,4 @@
+#include "WaylandServer.h"
 #include "Wayland.h"
 #include "HaikuCompositor.h"
 #include "HaikuSubcompositor.h"
@@ -17,6 +18,7 @@
 
 #include <Application.h>
 #include <OS.h>
+#include "AppKitPtrs.h"
 
 
 static void Assert(bool cond) {if (!cond) abort();}
@@ -40,6 +42,33 @@ HaikuSurface *haiku_surface_create(struct wl_client *client, uint32_t version, u
 HaikuXdgSurface *haiku_xdg_surface_create(struct HaikuXdgWmBase *client, struct HaikuSurface *surface, uint32_t id);
 
 
+ServerHandler gServerHandler;
+BMessenger gServerMessenger;
+
+ServerHandler::ServerHandler(): BHandler("server")
+{}
+
+ServerHandler::~ServerHandler()
+{}
+
+void ServerHandler::MessageReceived(BMessage *msg)
+{
+	switch (msg->what) {
+	case closureSendMsg: {
+		struct wl_client *client;
+		msg->FindPointer("client", (void**)&client);
+		struct wl_closure *closure;
+		msg->FindPointer("closure", (void**)&closure);
+		wl_client_dispatch(client, closure);
+		return;
+	}
+	default:
+		break;
+	}
+	BHandler::MessageReceived(msg);
+}
+
+
 class Application: public BApplication {
 public:
 	enum {
@@ -51,7 +80,6 @@ public:
 	
 	thread_id Run() override;
 	void Quit() override;
-	void MessageReceived(BMessage *msg) override;
 };
 
 Application::Application(): BApplication("application/x-vnd.Wayland-App")
@@ -69,30 +97,19 @@ void Application::Quit()
 	exit(0);
 }
 
-void Application::MessageReceived(BMessage *msg)
-{
-	switch (msg->what) {
-	case closureSendMsg: {
-		struct wl_client *client;
-		msg->FindPointer("client", (void**)&client);
-		struct wl_closure *closure;
-		msg->FindPointer("closure", (void**)&closure);
-		wl_client_dispatch(client, closure);
-		return;
-	}
-	default:
-		break;
-	}
-	BApplication::MessageReceived(msg);
-}
-
 
 //#pragma mark - entry points
 
 extern "C" _EXPORT int wl_ips_client_connected(void **clientOut, void *clientDisplay, client_enqueue_proc display_enqueue)
 {
-	new Application();
-	be_app->Run();
+	if (be_app == NULL) {
+		new Application();
+		be_app->Run();
+	}
+	if (gServerHandler.Looper() == NULL) {
+		AppKitPtrs::LockedPtr(be_app)->AddHandler(&gServerHandler);
+		gServerMessenger.SetTo(&gServerHandler);
+	}
 
 	fprintf(stderr, "wl_ips_client_connected\n");
 	struct wl_display *display = wl_display_create();
@@ -127,7 +144,7 @@ extern "C" _EXPORT int wl_ips_closure_send(void *clientIn, struct wl_closure *cl
 		BMessage msg(Application::closureSendMsg);
 		msg.AddPointer("client", client);
 		msg.AddPointer("closure", closure);
-		be_app_messenger.SendMessage(&msg);
+		gServerMessenger.SendMessage(&msg);
 	} else {
 		wl_client_dispatch(client, closure);
 	}
