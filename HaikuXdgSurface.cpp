@@ -32,16 +32,69 @@ XdgSurfaceHook::XdgSurfaceHook(HaikuXdgSurface *xdgSurface):
 
 void XdgSurfaceHook::HandleCommit()
 {
-	BBitmap *bitmap = Base()->Bitmap();
-	if (Base()->View() != NULL) {
-		auto viewLocked = AppKitPtrs::LockedPtr(Base()->View());
-		if (bitmap != NULL) {
-			viewLocked->ResizeTo(bitmap->Bounds().Width(), bitmap->Bounds().Height());
+	// TODO: move to HaikuXdgToplevel/HaikuXdgPopup
+	if (fXdgSurface->HasServerDecoration()) {
+		// toplevel: window size limits
+		if (fXdgSurface->fToplevel != NULL && fXdgSurface->fToplevel->fSizeLimitsDirty) {
+			fXdgSurface->Window()->SetSizeLimits(
+				fXdgSurface->fToplevel->fMinWidth  == 0 ? 0     : fXdgSurface->fToplevel->fMinWidth  - 1,
+				fXdgSurface->fToplevel->fMaxWidth  == 0 ? 32768 : fXdgSurface->fToplevel->fMaxWidth  - 1,
+				fXdgSurface->fToplevel->fMinHeight == 0 ? 0     : fXdgSurface->fToplevel->fMinHeight - 1,
+				fXdgSurface->fToplevel->fMaxHeight == 0 ? 32768 : fXdgSurface->fToplevel->fMaxHeight - 1
+			);
+			if (
+				fXdgSurface->fToplevel->fMinWidth != 0 && fXdgSurface->fToplevel->fMinWidth == fXdgSurface->fToplevel->fMaxWidth &&
+				fXdgSurface->fToplevel->fMinHeight != 0 && fXdgSurface->fToplevel->fMinHeight == fXdgSurface->fToplevel->fMaxHeight
+			) {
+				fXdgSurface->Window()->SetFlags(fXdgSurface->Window()->Flags() | B_NOT_RESIZABLE);
+			} else {
+				fXdgSurface->Window()->SetFlags(fXdgSurface->Window()->Flags() & ~B_NOT_RESIZABLE);
+			}
+			fXdgSurface->fToplevel->fSizeLimitsDirty = false;
 		}
-		Base()->Invalidate();
+	
+		if ((int32_t)fXdgSurface->fToplevel->fResizeSerial - (int32_t)(int32_t)fXdgSurface->fAckSerial > 0) {
+		} else if (fXdgSurface->fGeometry.changed) {
+			fXdgSurface->fGeometry.changed = false;
+			BSize oldSize(fXdgSurface->fToplevel->fWidth - 1, fXdgSurface->fToplevel->fHeight - 1);
+			BSize newSize = oldSize;
+
+			if (fXdgSurface->Surface()->View() != NULL)
+				AppKitPtrs::LockedPtr(fXdgSurface->Surface()->View())->MoveTo(-fXdgSurface->Geometry().x, -fXdgSurface->Geometry().y);
+			newSize.width = fXdgSurface->Geometry().width - 1;
+			newSize.height = fXdgSurface->Geometry().height - 1;
+
+			if (oldSize != newSize) {
+				fXdgSurface->fToplevel->fSizeChanged = true;
+				fXdgSurface->fToplevel->fWidth = (int32_t)newSize.width + 1;
+				fXdgSurface->fToplevel->fHeight = (int32_t)newSize.height + 1;
+
+				fXdgSurface->Window()->ResizeTo(newSize.width, newSize.height);
+			}
+		}
+	} else {
+		if (fXdgSurface->Surface()->Bitmap() != NULL) {
+			BSize oldSize = fXdgSurface->Window()->Size();
+			BSize newSize = fXdgSurface->Surface()->Bitmap()->Bounds().Size();
+			if (oldSize != newSize) {
+				fXdgSurface->Window()->ResizeTo(newSize.width, newSize.height);
+			}
+		}
 	}
 
-	// TODO: move to HaikuXdgToplevel/HaikuXdgPopup
+	// initial window show
+	if (!fXdgSurface->fSurfaceInitalized && fXdgSurface->Surface()->Bitmap() != NULL) {
+		if (fXdgSurface->Surface()->ServerDecoration() != NULL) {
+			fXdgSurface->Window()->SetLook(fXdgSurface->Surface()->ServerDecoration()->Look());
+		}
+		if (fXdgSurface->fToplevel != NULL) {
+			fXdgSurface->Window()->CenterOnScreen();
+		}
+		fXdgSurface->Window()->Show();
+		fXdgSurface->fSurfaceInitalized = true;
+	}
+
+	// initial configure
 	if (!fXdgSurface->fConfigureCalled) {
 		if (fXdgSurface->fToplevel != NULL) {
 			fXdgSurface->fToplevel->DoSendConfigure();
@@ -53,72 +106,6 @@ void XdgSurfaceHook::HandleCommit()
 		}
 		fXdgSurface->fConfigureCalled = true;
 		fXdgSurface->SendConfigure(fXdgSurface->NextSerial());
-	}
-
-	if (fXdgSurface->fToplevel != NULL && fXdgSurface->fToplevel->fSizeLimitsDirty) {
-		fXdgSurface->Window()->SetSizeLimits(
-			fXdgSurface->fToplevel->fMinWidth  == 0 ? 0     : fXdgSurface->fToplevel->fMinWidth  - 1,
-			fXdgSurface->fToplevel->fMaxWidth  == 0 ? 32768 : fXdgSurface->fToplevel->fMaxWidth  - 1,
-			fXdgSurface->fToplevel->fMinHeight == 0 ? 0     : fXdgSurface->fToplevel->fMinHeight - 1,
-			fXdgSurface->fToplevel->fMaxHeight == 0 ? 32768 : fXdgSurface->fToplevel->fMaxHeight - 1
-		);
-		if (
-			fXdgSurface->fToplevel->fMinWidth != 0 && fXdgSurface->fToplevel->fMinWidth == fXdgSurface->fToplevel->fMaxWidth &&
-			fXdgSurface->fToplevel->fMinHeight != 0 && fXdgSurface->fToplevel->fMinHeight == fXdgSurface->fToplevel->fMaxHeight
-		) {
-			fXdgSurface->Window()->SetFlags(fXdgSurface->Window()->Flags() | B_NOT_RESIZABLE);
-		} else {
-			fXdgSurface->Window()->SetFlags(fXdgSurface->Window()->Flags() & ~B_NOT_RESIZABLE);
-		}
-		fXdgSurface->fToplevel->fSizeLimitsDirty = false;
-	}
-
-	if (fXdgSurface->fToplevel != NULL && (int32_t)fXdgSurface->fToplevel->fResizeSerial - (int32_t)(int32_t)fXdgSurface->fAckSerial > 0) {
-	} else if (fXdgSurface->fGeometry.changed) {
-		fXdgSurface->fGeometry.changed = false;
-		BSize oldSize;
-		if (fXdgSurface->fToplevel != NULL) {
-			oldSize.width = fXdgSurface->fToplevel->fWidth - 1;
-			oldSize.height = fXdgSurface->fToplevel->fHeight - 1;
-		} else {
-			oldSize = fXdgSurface->Window()->Size();
-		}
-		BSize newSize = oldSize;
-		if (
-			fXdgSurface->Geometry().valid &&
-			fXdgSurface->Surface()->ServerDecoration() != NULL &&
-			fXdgSurface->Surface()->ServerDecoration()->Mode() == OrgKdeKwinServerDecoration::modeServer
-		) {
-			if (fXdgSurface->Surface()->View() != NULL)
-				AppKitPtrs::LockedPtr(fXdgSurface->Surface()->View())->MoveTo(-fXdgSurface->Geometry().x, -fXdgSurface->Geometry().y);
-			newSize.width = fXdgSurface->Geometry().width - 1;
-			newSize.height = fXdgSurface->Geometry().height - 1;
-		} else {
-			newSize = fXdgSurface->Surface()->Bitmap()->Bounds().Size();
-		}
-		if (oldSize != newSize) {
-			if (fXdgSurface->fToplevel != NULL) {
-				fXdgSurface->fToplevel->fSizeChanged = true;
-				fXdgSurface->fToplevel->fWidth = (int32_t)newSize.width + 1;
-				fXdgSurface->fToplevel->fHeight = (int32_t)newSize.height + 1;
-			}
-			fXdgSurface->Window()->ResizeTo(newSize.width, newSize.height);
-		}
-	}
-	if (!fXdgSurface->fSurfaceInitalized && fXdgSurface->Surface()->Bitmap() != NULL) {
-		if (fXdgSurface->Surface()->ServerDecoration() != NULL) {
-			fXdgSurface->Window()->SetLook(fXdgSurface->Surface()->ServerDecoration()->Look());
-		}
-		if (fXdgSurface->fToplevel != NULL) {
-			fXdgSurface->Window()->CenterOnScreen();
-		}
-/*
-		if (fXdgSurface->fPopup != NULL) {
-			fXdgSurface->Window()->MoveBy(-fXdgSurface.Geometry().x, -fXdgSurface.Geometry().y);
-		}
-*/
-		fXdgSurface->Window()->Show();
-		fXdgSurface->fSurfaceInitalized = true;
 	}
 }
 
@@ -140,6 +127,14 @@ BWindow *HaikuXdgSurface::Window()
 	if (fToplevel != NULL) return fToplevel->Window();
 	if (fPopup != NULL) return fPopup->Window();
 	return NULL;
+}
+
+bool HaikuXdgSurface::HasServerDecoration()
+{
+	return
+		Geometry().valid &&
+		Surface()->ServerDecoration() != NULL &&
+		Surface()->ServerDecoration()->Mode() == OrgKdeKwinServerDecoration::modeServer;
 }
 
 

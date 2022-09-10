@@ -67,16 +67,12 @@ void WaylandWindow::FrameResized(float newWidth, float newHeight)
 		return;
 	}
 
-	if(!(
-		fToplevel->XdgSurface()->Geometry().valid &&
-		fToplevel->XdgSurface()->Surface()->ServerDecoration() != NULL &&
-		fToplevel->XdgSurface()->Surface()->ServerDecoration()->Mode() == OrgKdeKwinServerDecoration::modeServer
-	))
+	if(!fToplevel->XdgSurface()->HasServerDecoration())
 		return;
 
-	if ((int32_t)newWidth + 1 == fToplevel->fWidth && (int32_t)newHeight + 1 == fToplevel->fHeight) {
+	if ((int32_t)newWidth + 1 == fToplevel->fWidth && (int32_t)newHeight + 1 == fToplevel->fHeight)
 		return;
-	}
+
 	fToplevel->fWidth = (int32_t)newWidth + 1;
 	fToplevel->fHeight = (int32_t)newHeight + 1;
 

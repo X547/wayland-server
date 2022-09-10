@@ -47,6 +47,7 @@ public:
 	HaikuSurface *Surface() {return fSurface;}
 	HaikuXdgToplevel *Toplevel() {return fToplevel;}
 	BWindow *Window();
+	bool HasServerDecoration();
 
 	void HandleGetToplevel(uint32_t id) override;
 	void HandleGetPopup(uint32_t id, struct wl_resource *parent, struct wl_resource *positioner) override;
