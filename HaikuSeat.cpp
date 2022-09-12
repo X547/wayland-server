@@ -128,12 +128,12 @@ static uint32_t FromHaikuKeyCode(uint32 haikuKey)
 		case 0x63: wlKey = KEY_RIGHT; break;
 		case 0x64: wlKey = KEY_KP0; break;
 		case 0x65: wlKey = KEY_KPDOT; break;
-		//case 0x66: wlKey = VK_LWIN; break;
-		//case 0x67: wlKey = VK_RWIN; break;
-		//case 0x68: wlKey = VK_APPS; break;
+		case 0x66: wlKey = KEY_LEFTMETA; break;
+		case 0x67: wlKey = KEY_RIGHTMETA; break;
+		case 0x68: wlKey = KEY_COMPOSE; break;
 		//case 0x69: wlKey = 0; break;
-		case 0x6a: wlKey = KEY_RO; break;
-		case 0x6b: wlKey = KEY_102ND; break;
+		case 0x6a: wlKey = KEY_YEN; break;
+		case 0x6b: wlKey = KEY_RO; break;
 
 		default:
 			fprintf(stderr, "[!] unknown key: %#x\n", haikuKey);
@@ -162,6 +162,8 @@ static uint32_t FromHaikuModifiers(uint32 haikuModifiers)
 	if (B_SHIFT_KEY   & haikuModifiers) wlModifiers |= (1 << 0);
 	if (B_CONTROL_KEY & haikuModifiers) wlModifiers |= (1 << 2);
 	if (B_COMMAND_KEY & haikuModifiers) wlModifiers |= (1 << 3) | (1 << 18);
+	if (B_CAPS_LOCK   & haikuModifiers) wlModifiers |= (1 << 1);
+	if (B_NUM_LOCK    & haikuModifiers) wlModifiers |= (1 << 4);
 	return wlModifiers;
 }
 
