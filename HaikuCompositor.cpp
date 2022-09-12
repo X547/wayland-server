@@ -279,6 +279,14 @@ void HaikuSurface::HandleCommit()
 		fBuffer = {};
 		fBitmap.Unset();
 	}
+
+	if (View() != NULL) {
+		auto viewLocked = AppKitPtrs::LockedPtr(View());
+		if (Bitmap() != NULL) {
+			viewLocked->ResizeTo(Bitmap()->Bounds().Width(), Bitmap()->Bounds().Height());
+		}
+		Invalidate();
+	}
 	if (fHook.IsSet()) {
 		fHook->HandleCommit();
 	}
