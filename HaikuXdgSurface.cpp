@@ -223,6 +223,7 @@ HaikuXdgSurface *HaikuXdgSurface::Create(struct HaikuXdgWmBase *client, struct H
 		return NULL;
 	}
 	xdgSurface->fSurface = surface;
+	xdgSurface->fRoot = xdgSurface;
 	surface->fXdgSurface = xdgSurface;
 	surface->SetHook(new XdgSurfaceHook(xdgSurface));
 

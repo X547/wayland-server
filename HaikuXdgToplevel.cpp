@@ -104,8 +104,21 @@ void HaikuXdgToplevel::DoSendConfigure()
 	SendConfigure(fWidth, fHeight, &state);
 }
 
-void HaikuXdgToplevel::HandleSetParent(struct wl_resource *parent)
+void HaikuXdgToplevel::HandleSetParent(struct wl_resource *_parent)
 {
+	// TODO: update root window when parent window is closed
+	HaikuXdgToplevel *parent = HaikuXdgToplevel::FromResource(_parent);
+	if (parent == NULL) {
+		if (XdgSurface()->fRoot != XdgSurface()) {
+			fWindow->RemoveFromSubset(XdgSurface()->fRoot->Window());
+			fWindow->SetFeel(B_NORMAL_WINDOW_FEEL);
+			XdgSurface()->fRoot = XdgSurface();
+		}
+	} else {
+		XdgSurface()->fRoot = parent->XdgSurface()->fRoot;
+		fWindow->SetFeel(B_FLOATING_SUBSET_WINDOW_FEEL);
+		fWindow->AddToSubset(parent->XdgSurface()->fRoot->Window());
+	}
 }
 
 void HaikuXdgToplevel::HandleSetTitle(const char *title)

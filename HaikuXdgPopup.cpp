@@ -61,12 +61,13 @@ HaikuXdgPopup *HaikuXdgPopup::Create(HaikuXdgSurface *xdgSurface, uint32_t id, s
 
 	xdgPopup->fXdgSurface = xdgSurface;
 	xdgPopup->fParent = HaikuXdgSurface::FromResource(_parent);
+	xdgPopup->fXdgSurface->fRoot = xdgPopup->fParent->fRoot;
 
 	xdgPopup->UpdatePosition(_positioner);
 
-	xdgPopup->fWindow = new WaylandPopupWindow(xdgPopup, BRect(), "", B_NO_BORDER_WINDOW_LOOK, B_NORMAL_WINDOW_FEEL, B_AVOID_FOCUS);
+	xdgPopup->fWindow = new WaylandPopupWindow(xdgPopup, BRect(), "", B_NO_BORDER_WINDOW_LOOK, B_FLOATING_SUBSET_WINDOW_FEEL, B_AVOID_FOCUS);
 	xdgSurface->Surface()->AttachWindow(xdgPopup->fWindow);
-	xdgPopup->fWindow->AddToSubset(xdgPopup->fParent->Window());
+	xdgPopup->fWindow->AddToSubset(xdgPopup->fXdgSurface->fRoot->Window());
 
 	return xdgPopup;
 }

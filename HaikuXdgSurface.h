@@ -29,12 +29,14 @@ public:
 
 private:
 	friend class HaikuXdgToplevel;
+	friend class HaikuXdgPopup;
 	friend class HaikuSurface;
 	friend class XdgSurfaceHook;
 
 	HaikuSurface *fSurface{};
 	HaikuXdgToplevel *fToplevel{};
 	HaikuXdgPopup *fPopup{};
+	HaikuXdgSurface *fRoot{};
 
 	uint32_t fSerial = 1;
 	uint32_t fAckSerial = 1;
