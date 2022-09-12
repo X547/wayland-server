@@ -26,7 +26,7 @@ protocols = {
 	'server-decoration': 'protocols/server-decoration.xml',
 }
 
-wlr_files = []
+wl_files = []
 protocols_code = {}
 protocols_server_header = {}
 protocols_client_header = {}
@@ -37,7 +37,7 @@ foreach name, path : protocols
 		output: '@BASENAME@-protocol.c',
 		command: [wayland_scanner, 'private-code', '@INPUT@', '@OUTPUT@'],
 	)
-	wlr_files += code
+	wl_files += code
 
 	server_header = custom_target(
 		name.underscorify() + '_server_h',
@@ -45,7 +45,7 @@ foreach name, path : protocols
 		output: '@BASENAME@-protocol.h',
 		command: [wayland_scanner, 'server-header', '@INPUT@', '@OUTPUT@'],
 	)
-	wlr_files += server_header
+	wl_files += server_header
 
 	client_header = custom_target(
 		name.underscorify() + '_client_h',
@@ -76,7 +76,7 @@ foreach name, path : protocols_cpp
 		output: name + '.cpp',
 		command: [wayland_scanner, 'private-code-cpp', '@INPUT@', '@OUTPUT@'],
 	)
-	wlr_files += code
+	wl_files += code
 
 	server_header = custom_target(
 		name + '_h',
@@ -84,7 +84,7 @@ foreach name, path : protocols_cpp
 		output: name + '.h',
 		command: [wayland_scanner, 'server-header-cpp', '@INPUT@', '@OUTPUT@'],
 	)
-	wlr_files += server_header
+	wl_files += server_header
 endforeach
 
 
@@ -103,7 +103,7 @@ shared_library('wayland-server-inproc',
 		'HaikuOutput.cpp',
 		'HaikuSeat.cpp',
 		'HaikuDataDeviceManager.cpp',
-		wlr_files
+		wl_files
 	],
 	name_prefix: '',
 	include_directories: [
