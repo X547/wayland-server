@@ -48,9 +48,6 @@ BMessenger gServerMessenger;
 ServerHandler::ServerHandler(): BHandler("server")
 {}
 
-ServerHandler::~ServerHandler()
-{}
-
 void ServerHandler::MessageReceived(BMessage *msg)
 {
 	switch (msg->what) {
@@ -76,8 +73,8 @@ public:
 	};
 
 	Application();
-	virtual ~Application() {}
-	
+	virtual ~Application() = default;
+
 	thread_id Run() override;
 	void Quit() override;
 };

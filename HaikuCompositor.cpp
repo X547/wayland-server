@@ -33,7 +33,7 @@ private:
 	BRegion fRegion;
 
 public:
-	virtual ~HaikuRegion() {}
+	virtual ~HaikuRegion() = default;
 	static HaikuRegion *FromResource(struct wl_resource *resource) {return (HaikuRegion*)WlResource::FromResource(resource);}
 
 	const BRegion &Region() {return fRegion;}
@@ -99,7 +99,7 @@ private:
 
 public:
 	WaylandView(HaikuSurface *surface);
-	virtual ~WaylandView() {}
+	virtual ~WaylandView() = default;
 
 	HaikuSurface *Surface() {return fSurface;}
 	

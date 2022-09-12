@@ -24,7 +24,7 @@ private:
 
 public:
 	WaylandWindow(HaikuXdgToplevel *toplevel, BRect frame, const char* title, window_look look, window_feel feel, uint32 flags, uint32 workspace = B_CURRENT_WORKSPACE);
-	virtual ~WaylandWindow() {}
+	virtual ~WaylandWindow() = default;
 
 	HaikuXdgToplevel *Toplevel() {return fToplevel;}
 

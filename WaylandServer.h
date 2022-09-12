@@ -11,7 +11,7 @@ public:
 	};
 
 	ServerHandler();
-	virtual ~ServerHandler();
+	virtual ~ServerHandler() = default;
 
 	void MessageReceived(BMessage *msg) final;
 };

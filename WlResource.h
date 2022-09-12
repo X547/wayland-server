@@ -9,7 +9,7 @@ private:
 	static int Dispatcher(const void *impl, void *resource, uint32_t opcode, const struct wl_message *message, union wl_argument *args);
 
 public:
-	virtual ~WlResource() {}
+	virtual ~WlResource() = default;
 	bool Init(struct wl_client *wl_client, uint32_t version, uint32_t id);
 	void Destroy();
 	virtual const struct wl_interface *Interface() const = 0;

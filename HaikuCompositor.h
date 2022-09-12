@@ -34,7 +34,7 @@ public:
 		friend class HaikuSurface;
 		HaikuSurface *fBase{};
 	public:
-		virtual ~Hook() {};
+		virtual ~Hook() = default;
 		HaikuSurface *Base() {return fBase;}
 		virtual void HandleCommit() = 0;
 	};
