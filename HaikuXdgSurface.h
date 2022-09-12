@@ -11,14 +11,21 @@ class HaikuXdgSurface: public XdgSurface {
 public:
 	struct GeometryInfo {
 		bool valid;
-		bool changed;
 		int32_t x;
 		int32_t y;
 		int32_t width;
 		int32_t height;
-	};
 
-	HaikuXdgWmBase *client;
+		inline bool Equals(GeometryInfo &other)
+		{
+			return
+				valid  == other.valid &&
+				x      == other.x     &&
+				y      == other.y     &&
+				width  == other.width &&
+				height == other.height;
+		}
+	};
 
 private:
 	friend class HaikuXdgToplevel;
@@ -34,7 +41,7 @@ private:
 	bool fConfigureCalled = false;
 	bool fSurfaceInitalized = false;
 	bool fConfigurePending = false;
-	GeometryInfo fGeometry{};
+	GeometryInfo fGeometry{}, fPendingGeometry{};
 
 public:
 	virtual ~HaikuXdgSurface();
@@ -48,6 +55,10 @@ public:
 	HaikuXdgToplevel *Toplevel() {return fToplevel;}
 	BWindow *Window();
 	bool HasServerDecoration();
+	void ConvertFromScreen(BPoint &pt);
+	void ConvertToScreen(BPoint &pt);
+	void ConvertFromScreen(BRect &rect);
+	void ConvertToScreen(BRect &rect);
 
 	void HandleGetToplevel(uint32_t id) override;
 	void HandleGetPopup(uint32_t id, struct wl_resource *parent, struct wl_resource *positioner) override;

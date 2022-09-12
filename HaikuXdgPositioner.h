@@ -1,5 +1,6 @@
 #pragma once
 #include "XdgShell.h"
+#include <Rect.h>
 
 
 class HaikuXdgWmBase;
@@ -56,8 +57,8 @@ public:
 	static HaikuXdgPositioner *FromResource(struct wl_resource *resource) {return (HaikuXdgPositioner*)WlResource::FromResource(resource);}
 
 	const State &GetState() const {return fState;}
+	void GetPosition(BRect &pos, const BRect &workArea);
 
-	void HandleDestroy() final;
 	void HandleSetSize(int32_t width, int32_t height) final;
 	void HandleSetAnchorRect(int32_t x, int32_t y, int32_t width, int32_t height) final;
 	void HandleSetAnchor(uint32_t anchor) final;

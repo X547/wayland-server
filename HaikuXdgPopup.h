@@ -1,9 +1,9 @@
 #include "XdgShell.h"
+#include <Rect.h>
 
 
 struct HaikuXdgSurface;
 class BWindow;
-class BRect;
 class WaylandPopupWindow;
 
 class HaikuXdgPopup: public XdgPopup {
@@ -12,8 +12,9 @@ private:
 	HaikuXdgSurface *fXdgSurface{};
 	HaikuXdgSurface *fParent{};
 	WaylandPopupWindow *fWindow{};
-	
-	void CalcWndRect(BRect &wndRect, struct wl_resource *_positioner);
+	BRect fPosition;
+
+	void UpdatePosition(struct wl_resource *_positioner);
 
 public:
 	static HaikuXdgPopup *Create(HaikuXdgSurface *xdg_surface, uint32_t id, struct wl_resource *parent, struct wl_resource *positioner);

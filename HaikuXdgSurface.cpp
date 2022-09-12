@@ -52,17 +52,16 @@ void XdgSurfaceHook::HandleCommit()
 			}
 			fXdgSurface->fToplevel->fSizeLimitsDirty = false;
 		}
-	
+
 		if ((int32_t)fXdgSurface->fToplevel->fResizeSerial - (int32_t)(int32_t)fXdgSurface->fAckSerial > 0) {
-		} else if (fXdgSurface->fGeometry.changed) {
-			fXdgSurface->fGeometry.changed = false;
+		} else if (!fXdgSurface->fGeometry.Equals(fXdgSurface->fPendingGeometry)) {
 			BSize oldSize(fXdgSurface->fToplevel->fWidth - 1, fXdgSurface->fToplevel->fHeight - 1);
 			BSize newSize = oldSize;
 
 			if (fXdgSurface->Surface()->View() != NULL)
-				AppKitPtrs::LockedPtr(fXdgSurface->Surface()->View())->MoveTo(-fXdgSurface->Geometry().x, -fXdgSurface->Geometry().y);
-			newSize.width = fXdgSurface->Geometry().width - 1;
-			newSize.height = fXdgSurface->Geometry().height - 1;
+				AppKitPtrs::LockedPtr(fXdgSurface->Surface()->View())->MoveTo(-fXdgSurface->fPendingGeometry.x, -fXdgSurface->fPendingGeometry.y);
+			newSize.width = fXdgSurface->fPendingGeometry.width - 1;
+			newSize.height = fXdgSurface->fPendingGeometry.height - 1;
 
 			if (oldSize != newSize) {
 				fXdgSurface->fToplevel->fSizeChanged = true;
@@ -73,6 +72,15 @@ void XdgSurfaceHook::HandleCommit()
 			}
 		}
 	} else {
+		if (
+			fXdgSurface->fPendingGeometry.x != fXdgSurface->fGeometry.x ||
+			fXdgSurface->fPendingGeometry.y != fXdgSurface->fGeometry.y
+		) {
+			fXdgSurface->Window()->MoveBy(
+				fXdgSurface->fGeometry.x - fXdgSurface->fPendingGeometry.x,
+				fXdgSurface->fGeometry.y - fXdgSurface->fPendingGeometry.x
+			);
+		}
 		if (fXdgSurface->Surface()->Bitmap() != NULL) {
 			BSize oldSize = fXdgSurface->Window()->Size();
 			BSize newSize = fXdgSurface->Surface()->Bitmap()->Bounds().Size();
@@ -81,6 +89,7 @@ void XdgSurfaceHook::HandleCommit()
 			}
 		}
 	}
+	fXdgSurface->fGeometry = fXdgSurface->fPendingGeometry;
 
 	// initial window show
 	if (!fXdgSurface->fSurfaceInitalized && fXdgSurface->Surface()->Bitmap() != NULL) {
@@ -94,14 +103,21 @@ void XdgSurfaceHook::HandleCommit()
 		fXdgSurface->fSurfaceInitalized = true;
 	}
 
+	if (fXdgSurface->fPopup != NULL) {
+		BRect wndRect = fXdgSurface->fPopup->fPosition;
+		if (fXdgSurface->Geometry().valid && !fXdgSurface->HasServerDecoration())
+			wndRect.OffsetBy(-fXdgSurface->Geometry().x, -fXdgSurface->Geometry().y);
+		fXdgSurface->fPopup->fParent->ConvertToScreen(wndRect);
+		fXdgSurface->Window()->MoveTo(wndRect.left, wndRect.top);
+	}
+
 	// initial configure
 	if (!fXdgSurface->fConfigureCalled) {
 		if (fXdgSurface->fToplevel != NULL) {
 			fXdgSurface->fToplevel->DoSendConfigure();
 		}
 		if (fXdgSurface->fPopup != NULL) {
-			BRect wndRect = fXdgSurface->fPopup->Window()->Frame();
-			fXdgSurface->fPopup->fParent->Window()->ConvertFromScreen(&wndRect);
+			BRect wndRect = fXdgSurface->fPopup->fPosition;
 			fXdgSurface->fPopup->SendConfigure(wndRect.left, wndRect.top, (int32_t)wndRect.Width() + 1, (int32_t)wndRect.Height() + 1);
 		}
 		fXdgSurface->fConfigureCalled = true;
@@ -137,6 +153,36 @@ bool HaikuXdgSurface::HasServerDecoration()
 		Surface()->ServerDecoration()->Mode() == OrgKdeKwinServerDecoration::modeServer;
 }
 
+void HaikuXdgSurface::ConvertFromScreen(BPoint &pt)
+{
+	Window()->ConvertFromScreen(&pt);
+	if (fGeometry.valid)
+		pt -= BPoint(fGeometry.x, fGeometry.y);
+}
+
+void HaikuXdgSurface::ConvertToScreen(BPoint &pt)
+{
+	if (fGeometry.valid)
+		pt += BPoint(fGeometry.x, fGeometry.y);
+
+	Window()->ConvertToScreen(&pt);
+}
+
+void HaikuXdgSurface::ConvertFromScreen(BRect &rect)
+{
+	Window()->ConvertFromScreen(&rect);
+	if (fGeometry.valid && !HasServerDecoration())
+		rect.OffsetBy(-fGeometry.x, -fGeometry.y);
+}
+
+void HaikuXdgSurface::ConvertToScreen(BRect &rect)
+{
+	if (fGeometry.valid && !HasServerDecoration())
+		rect.OffsetBy(fGeometry.x, fGeometry.y);
+
+	Window()->ConvertToScreen(&rect);
+}
+
 
 void HaikuXdgSurface::HandleGetToplevel(uint32_t id)
 {
@@ -150,12 +196,13 @@ void HaikuXdgSurface::HandleGetPopup(uint32_t id, struct wl_resource *parent, st
 
 void HaikuXdgSurface::HandleSetWindowGeometry(int32_t x, int32_t y, int32_t width, int32_t height)
 {
-	fGeometry.valid = true;
-	fGeometry.changed = true;
-	fGeometry.x = x;
-	fGeometry.y = y;
-	fGeometry.width = width;
-	fGeometry.height = height;
+	fPendingGeometry = {
+		.valid = true,
+		.x = x,
+		.y = y,
+		.width = width,
+		.height = height
+	};
 }
 
 void HaikuXdgSurface::HandleAckConfigure(uint32_t serial)
@@ -175,7 +222,6 @@ HaikuXdgSurface *HaikuXdgSurface::Create(struct HaikuXdgWmBase *client, struct H
 	if (!xdgSurface->Init(client->Client(), wl_resource_get_version(client->ToResource()), id)) {
 		return NULL;
 	}
-	xdgSurface->client = client;
 	xdgSurface->fSurface = surface;
 	surface->fXdgSurface = xdgSurface;
 	surface->SetHook(new XdgSurfaceHook(xdgSurface));
