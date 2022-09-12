@@ -31,6 +31,8 @@ void WlResource::Destroy()
 
 WlResource *WlResource::FromResource(struct wl_resource *resource)
 {
+	if (resource == NULL)
+		return NULL;
 	WlResource *resourceOut = (WlResource*)wl_resource_get_user_data(resource);
 	if (resourceOut == NULL || !wl_resource_instance_of(resource, resourceOut->Interface(), NULL)) {
 		return NULL;
