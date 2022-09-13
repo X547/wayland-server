@@ -12,10 +12,15 @@ class HaikuDataDevice;
 
 class HaikuDataSource: public WlDataSource {
 private:
+	friend class HaikuDataOffer;
+	friend class HaikuDataDevice;
+
+	HaikuDataDevice *fDataDevice{};
 	std::set<std::string> fMimeTypes;
 
 public:
 	static HaikuDataSource *FromResource(struct wl_resource *resource) {return (HaikuDataSource*)WlResource::FromResource(resource);}
+	virtual ~HaikuDataSource();
 
 	std::set<std::string> &MimeTypes() {return fMimeTypes;}
 
@@ -42,7 +47,10 @@ public:
 
 class HaikuDataDevice: public WlDataDevice {
 private:
+	friend class HaikuDataSource;
+
 	HaikuSeat *fSeat;
+	HaikuDataSource *fDataSource;
 
 	class ClipboardWatcher: public BHandler {
 	public:

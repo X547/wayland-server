@@ -19,6 +19,11 @@ enum {
 
 //#pragma mark - HaikuDataSource
 
+HaikuDataSource::~HaikuDataSource()
+{
+	if (fDataDevice != NULL && fDataDevice->fDataSource == this)
+		fDataDevice->fDataSource = NULL;
+}
 
 status_t HaikuDataSource::ReadData(std::vector<uint8> &data, const char *mimeType)
 {
@@ -148,6 +153,11 @@ void HaikuDataDevice::ClipboardWatcher::MessageReceived(BMessage *msg)
 		AutoLocker<BClipboard> clipboard(be_clipboard);
 		if (!clipboard.IsLocked()) return;
 
+		if (Base().fDataSource != NULL) {
+			Base().fDataSource->SendCancelled();
+			Base().fDataSource = NULL;
+		}
+
 		HaikuDataDevice *dataDevice = &Base();
 		HaikuDataOffer *dataOffer = HaikuDataOffer::Create(dataDevice, *be_clipboard->Data());
 		dataDevice->SendSelection(dataOffer->ToResource());
@@ -203,6 +213,9 @@ void HaikuDataDevice::HandleSetSelection(struct wl_resource *_source, uint32_t s
 	*clipper = *srcMsg.Get();
 	clipper->what = B_MIME_DATA;
 	clipboard.Get()->Commit();
+
+	fDataSource = source;
+	source->fDataDevice = this;
 }
 
 
