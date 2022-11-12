@@ -102,12 +102,14 @@ shared_library('wayland-server-inproc',
 		'HaikuServerDecoration.cpp',
 		'HaikuOutput.cpp',
 		'HaikuSeat.cpp',
+		'XkbKeymap.cpp',
 		'HaikuDataDeviceManager.cpp',
 		wl_files
 	],
 	name_prefix: '',
 	include_directories: [
 		'/boot/system/develop/headers/private/shared',
+		'/boot/system/develop/headers/private/interface',
 	],
 	dependencies: [
 		cpp.find_library('be'),

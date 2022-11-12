@@ -56,6 +56,7 @@ public:
 	void SetKeyboardFocus(HaikuSurface *surface, bool setFocus);
 	void DoTrack(TrackId id, XdgToplevel::ResizeEdge resizeEdge = XdgToplevel::resizeEdgeNone);
 	bool MessageReceived(HaikuSurface *surface, BMessage *msg);
+	void UpdateKeymap();
 
 	void HandleGetPointer(uint32_t id) final;
 	void HandleGetKeyboard(uint32_t id) final;

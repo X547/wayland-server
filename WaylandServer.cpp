@@ -9,6 +9,7 @@
 #include "HaikuDataDeviceManager.h"
 #include "HaikuSeat.h"
 #include "HaikuServerDecoration.h"
+#include "WaylandEnv.h"
 
 #include <wayland-server-core.h>
 #include <wayland-server-protocol.h>
@@ -67,16 +68,28 @@ void ServerHandler::MessageReceived(BMessage *msg)
 
 
 class Application: public BApplication {
+private:
+	// TODO: support multiple clients
+	struct wl_client *fClient{};
+
 public:
 	Application();
 	virtual ~Application() = default;
 
+	void AddClient(struct wl_client *client);
+
 	thread_id Run() override;
 	void Quit() override;
+	void MessageReceived(BMessage *msg) override;
 };
 
 Application::Application(): BApplication("application/x-vnd.Wayland-App")
 {
+}
+
+void Application::AddClient(struct wl_client *client)
+{
+	fClient = client;
 }
 
 thread_id Application::Run()
@@ -88,6 +101,20 @@ void Application::Quit()
 {
 	BApplication::Quit();
 	exit(0);
+}
+
+void Application::MessageReceived(BMessage *msg)
+{
+	switch (msg->what) {
+	case B_KEY_MAP_LOADED:
+		if (fClient == NULL) return;
+		WaylandEnv env(this);
+		HaikuSeat *seat = HaikuGetSeat(fClient);
+		if (seat == NULL) return;
+		seat->UpdateKeymap();
+		return;
+	}
+	return BApplication::MessageReceived(msg);
 }
 
 
@@ -109,6 +136,7 @@ extern "C" _EXPORT int wl_ips_client_connected(void **clientOut, void *clientDis
 	fprintf(stderr, "display: %p\n", display);
 	struct wl_client *client = wl_client_create_ips(display, clientDisplay, display_enqueue);
 	fprintf(stderr, "client: %p\n", client);
+	static_cast<Application*>(be_app)->AddClient(client);
 
 	Assert(wl_display_init_shm(display) == 0);
 	Assert(HaikuCompositor::CreateGlobal(display) != NULL);

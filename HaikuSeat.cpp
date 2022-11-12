@@ -3,6 +3,7 @@
 #include "HaikuXdgSurface.h"
 #include "HaikuXdgToplevel.h"
 #include "WaylandKeycodes.h"
+#include "XkbKeymap.h"
 #include <SupportDefs.h>
 #include <Application.h>
 #include <Window.h>
@@ -23,7 +24,7 @@ enum {
 static HaikuSeat *sHaikuSeat = NULL;
 
 
-static uint32_t FromHaikuKeyCode(uint32 haikuKey)
+uint32_t FromHaikuKeyCode(uint32 haikuKey)
 {
 	uint32_t wlKey;
 	switch (haikuKey) {
@@ -136,7 +137,7 @@ static uint32_t FromHaikuKeyCode(uint32 haikuKey)
 		case 0x6b: wlKey = KEY_RO; break;
 
 		default:
-			fprintf(stderr, "[!] unknown key: %#x\n", haikuKey);
+			//fprintf(stderr, "[!] unknown key: %#x\n", haikuKey);
 			wlKey = 0;
 	}
 	return wlKey;
@@ -459,6 +460,19 @@ bool HaikuSeat::MessageReceived(HaikuSurface *surface, BMessage *msg)
 	return false;
 }
 
+void HaikuSeat::UpdateKeymap()
+{
+	int fd;
+	if (ProduceXkbKeymap(fd) < B_OK) {
+		fprintf(stderr, "[!] ProduceXkbKeymap failed\n");
+		return;
+	}
+	FileDescriptorCloser fdCloser(fd);
+	struct stat st{};
+	fstat(fd, &st);
+	fKeyboard->SendKeymap(WlKeyboard::keymapFormatXkbV1, fd, st.st_size);
+}
+
 void HaikuSeat::HandleGetPointer(uint32_t id)
 {
 	// TODO: allow creating multiple interface instances?
@@ -485,6 +499,8 @@ void HaikuSeat::HandleGetKeyboard(uint32_t id)
 		return;
 	}
 	fKeyboard = keyboard;
+
+	UpdateKeymap();
 }
 
 void HaikuSeat::HandleGetTouch(uint32_t id)
