@@ -68,10 +68,6 @@ void ServerHandler::MessageReceived(BMessage *msg)
 
 class Application: public BApplication {
 public:
-	enum {
-		closureSendMsg = 1,
-	};
-
 	Application();
 	virtual ~Application() = default;
 
@@ -138,7 +134,7 @@ extern "C" _EXPORT int wl_ips_closure_send(void *clientIn, struct wl_closure *cl
 	struct wl_client *client = (struct wl_client*)clientIn;
 
 	if (true) {
-		BMessage msg(Application::closureSendMsg);
+		BMessage msg(ServerHandler::closureSendMsg);
 		msg.AddPointer("client", client);
 		msg.AddPointer("closure", closure);
 		gServerMessenger.SendMessage(&msg);
