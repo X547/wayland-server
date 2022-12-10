@@ -180,6 +180,8 @@ status_t ProduceXkbKeymap(int &fd)
 
 	fprintf(file, "};\n");
 
+	fputc(0, file);
+
 	fdCloser.Detach();
 	return B_OK;
 }
