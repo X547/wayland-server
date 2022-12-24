@@ -21,6 +21,7 @@ public:
 	HaikuXdgPopup *Popup() {return fPopup;}
 
 	bool QuitRequested() final;
+	void DispatchMessage(BMessage *msg, BHandler *target) final;
 };
 
 WaylandPopupWindow::WaylandPopupWindow(HaikuXdgPopup *popup, BRect frame, const char* title, window_look look, window_feel feel, uint32 flags, uint32 workspace):
@@ -35,6 +36,18 @@ bool WaylandPopupWindow::QuitRequested()
 	if (fPopup != NULL)
 		fPopup->SendPopupDone();
 	return true;
+}
+
+void WaylandPopupWindow::DispatchMessage(BMessage *msg, BHandler *target)
+{
+	switch (msg->what) {
+	case B_KEY_DOWN:
+	case B_UNMAPPED_KEY_DOWN:
+		// Do not use built-in shortcut handling.
+		target->MessageReceived(msg);
+		return;
+	}
+	BWindow::DispatchMessage(msg, target);
 }
 
 
