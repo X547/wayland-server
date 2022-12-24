@@ -75,7 +75,7 @@ uint32_t FromHaikuKeyCode(uint32 haikuKey)
 		case 0x2d: wlKey = KEY_U; break;
 		case 0x2e: wlKey = KEY_I; break;
 		case 0x2f: wlKey = KEY_O; break;
-		case 0x30: wlKey = KEY_P; break;	
+		case 0x30: wlKey = KEY_P; break;
 		case 0x31: wlKey = KEY_LEFTBRACE; break;
 		case 0x32: wlKey = KEY_RIGHTBRACE; break;
 		case 0x33: wlKey = KEY_BACKSLASH; break;
@@ -86,7 +86,7 @@ uint32_t FromHaikuKeyCode(uint32 haikuKey)
 		case 0x38: wlKey = KEY_KP8; break;
 		case 0x39: wlKey = KEY_KP9; break;
 		case 0x3a: wlKey = KEY_KPPLUS; break;
-		case 0x3b: wlKey = KEY_CAPSLOCK; break;	
+		case 0x3b: wlKey = KEY_CAPSLOCK; break;
 		case 0x3c: wlKey = KEY_A; break;
 		case 0x3d: wlKey = KEY_S; break;
 		case 0x3e: wlKey = KEY_D; break;
@@ -102,18 +102,18 @@ uint32_t FromHaikuKeyCode(uint32 haikuKey)
 		case 0x48: wlKey = KEY_KP4; break;
 		case 0x49: wlKey = KEY_KP5; break;
 		case 0x4a: wlKey = KEY_KP6; break;
-		case 0x4b: wlKey = KEY_LEFTSHIFT; break;	
+		case 0x4b: wlKey = KEY_LEFTSHIFT; break;
 		case 0x4c: wlKey = KEY_Z; break;
 		case 0x4d: wlKey = KEY_X; break;
 		case 0x4e: wlKey = KEY_C; break;
 		case 0x4f: wlKey = KEY_V; break;
 		case 0x50: wlKey = KEY_B; break;
 		case 0x51: wlKey = KEY_N; break;
-		case 0x52: wlKey = KEY_M; break;	
+		case 0x52: wlKey = KEY_M; break;
 		case 0x53: wlKey = KEY_COMMA; break;
 		case 0x54: wlKey = KEY_DOT; break;
 		case 0x55: wlKey = KEY_SLASH; break;
-		case 0x56: wlKey = KEY_RIGHTSHIFT; break;	
+		case 0x56: wlKey = KEY_RIGHTSHIFT; break;
 		case 0x57: wlKey = KEY_UP; break;
 		case 0x58: wlKey = KEY_KP1; break;
 		case 0x59: wlKey = KEY_KP2; break;
@@ -161,8 +161,8 @@ static uint32_t FromHaikuModifiers(uint32 haikuModifiers)
 {
 	uint32_t wlModifiers = 0;
 	if (B_SHIFT_KEY   & haikuModifiers) wlModifiers |= (1 << 0);
-	if (B_CONTROL_KEY & haikuModifiers) wlModifiers |= (1 << 2);
-	if (B_COMMAND_KEY & haikuModifiers) wlModifiers |= (1 << 3) | (1 << 18);
+	if (B_COMMAND_KEY & haikuModifiers) wlModifiers |= (1 << 2);
+	if (B_CONTROL_KEY & haikuModifiers) wlModifiers |= (1 << 3) | (1 << 18);
 	if (B_CAPS_LOCK   & haikuModifiers) wlModifiers |= (1 << 1);
 	if (B_NUM_LOCK    & haikuModifiers) wlModifiers |= (1 << 4);
 	return wlModifiers;
