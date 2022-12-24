@@ -132,7 +132,7 @@ uint32_t FromHaikuKeyCode(uint32 haikuKey)
 		case 0x66: wlKey = KEY_LEFTMETA; break;
 		case 0x67: wlKey = KEY_RIGHTMETA; break;
 		case 0x68: wlKey = KEY_COMPOSE; break;
-		//case 0x69: wlKey = 0; break;
+		case 0x69: wlKey = KEY_102ND; break;
 		case 0x6a: wlKey = KEY_YEN; break;
 		case 0x6b: wlKey = KEY_RO; break;
 
@@ -424,7 +424,7 @@ bool HaikuSeat::MessageReceived(HaikuSurface *surface, BMessage *msg)
 							HaikuXdgSurface *xdgSurface = fPointerFocus->XdgSurface();
 							HaikuXdgSurface::GeometryInfo oldGeometry = xdgSurface->Geometry();
 							if (!xdgSurface->SetConfigurePending()) true;
-							
+
 							fPointerFocus->View()->Window()->MoveBy(where.x - fTrack.origin.x, where.y - fTrack.origin.y);
 							struct wl_array array{};
 							xdgSurface->Toplevel()->SendConfigure(fTrack.wndWidth - (where.x - fTrack.origin.x), fTrack.wndHeight - (where.y - fTrack.origin.y), &array);
