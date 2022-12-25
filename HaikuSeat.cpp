@@ -168,6 +168,23 @@ static uint32_t FromHaikuModifiers(uint32 haikuModifiers)
 	return wlModifiers;
 }
 
+bool IsHaikuSystemShortcut(BMessage *msg)
+{
+	// Haiku bug #18172 workaround
+
+	const char* bytes = NULL;
+	if (msg->FindString("bytes", &bytes) < B_OK)
+		return false;
+
+	char key = bytes[0];
+	int32 rawKey = msg->GetInt32("key", 0);
+	uint32 modifiers = msg->GetInt32("modifiers", 0);
+
+	return
+		((key == B_TAB || rawKey == 0x11) && (modifiers & B_CONTROL_KEY) != 0) ||
+		(key == B_FUNCTION_KEY && rawKey == B_PRINT_KEY);
+}
+
 class SurfaceCursorHook: public HaikuSurface::Hook {
 public:
 	BPoint fHotspot;

@@ -1,6 +1,7 @@
 #include "HaikuXdgPopup.h"
 #include "HaikuXdgSurface.h"
 #include "HaikuXdgPositioner.h"
+#include "HaikuSeat.h"
 #include "WaylandEnv.h"
 
 #include "AppKitPtrs.h"
@@ -43,6 +44,9 @@ void WaylandPopupWindow::DispatchMessage(BMessage *msg, BHandler *target)
 	switch (msg->what) {
 	case B_KEY_DOWN:
 	case B_UNMAPPED_KEY_DOWN:
+		if (IsHaikuSystemShortcut(msg))
+			break;
+
 		// Do not use built-in shortcut handling.
 		target->MessageReceived(msg);
 		return;

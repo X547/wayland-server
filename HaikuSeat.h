@@ -64,4 +64,6 @@ public:
 };
 
 
+bool IsHaikuSystemShortcut(BMessage *msg);
+
 HaikuSeat *HaikuGetSeat(struct wl_client *wl_client);
