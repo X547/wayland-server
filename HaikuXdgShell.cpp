@@ -16,23 +16,20 @@ static void Assert(bool cond) {if (!cond) abort();}
 
 //#pragma mark - xdg_base
 
-struct wl_global *HaikuXdgWmBase::CreateGlobal(struct wl_display *display)
+
+HaikuXdgShell *HaikuXdgShell::Create(struct wl_display *display)
 {
-	HaikuXdgShell *xdg_shell = new HaikuXdgShell();
+	ObjectDeleter<HaikuXdgShell> global(new(std::nothrow) HaikuXdgShell());
+	if (!global.IsSet()) return NULL;
+	if (!global->Init(display, &xdg_wm_base_interface, WM_BASE_VERSION)) return NULL;
 
-	xdg_shell->global = wl_global_create(display, &xdg_wm_base_interface, WM_BASE_VERSION, xdg_shell, HaikuXdgWmBase::Bind);
-	Assert(xdg_shell->global != NULL);
+	wl_list_init(&global->clients);
 
-	wl_list_init(&xdg_shell->clients);
-
-	return xdg_shell->global;
+	return global.Detach();
 }
 
-void HaikuXdgWmBase::Bind(struct wl_client *wl_client, void *data, uint32_t version, uint32_t id)
+void HaikuXdgShell::Bind(struct wl_client *wl_client, uint32_t version, uint32_t id)
 {
-	HaikuXdgShell *xdg_shell = (HaikuXdgShell*)data;
-	Assert(wl_client && xdg_shell);
-	
 	HaikuXdgWmBase *client = new(std::nothrow) HaikuXdgWmBase();
 	if (client == NULL) {
 		wl_client_post_no_memory(wl_client);
@@ -44,10 +41,11 @@ void HaikuXdgWmBase::Bind(struct wl_client *wl_client, void *data, uint32_t vers
 
 	//wl_list_init(&client->surfaces);
 
-	client->shell = xdg_shell;
+	client->shell = this;
 
-	wl_list_insert(&xdg_shell->clients, &client->link);
+	wl_list_insert(&this->clients, &client->link);
 }
+
 
 HaikuXdgWmBase::~HaikuXdgWmBase()
 {

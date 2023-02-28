@@ -1,21 +1,19 @@
 #pragma once
 #include "Wayland.h"
+#include "WlGlobal.h"
 #include "ServerDecoration.h"
 
 #include <Window.h>
 
 
 class HaikuSurface;
+class HaikuServerDecorationManager;
 
-class HaikuServerDecorationManager: public OrgKdeKwinServerDecorationManager {
-private:
-	static void Bind(struct wl_client *wl_client, void *data, uint32_t version, uint32_t id);
-
+class HaikuServerDecorationManagerGlobal: public WlGlocal {
 public:
-	static struct wl_global *CreateGlobal(struct wl_display *display);
-	static HaikuServerDecorationManager *FromResource(struct wl_resource *resource) {return (HaikuServerDecorationManager*)WlResource::FromResource(resource);}
-
-	void HandleCreate(uint32_t id, struct wl_resource *surface) final;
+	static HaikuServerDecorationManagerGlobal *Create(struct wl_display *display);
+	virtual ~HaikuServerDecorationManagerGlobal() = default;
+	void Bind(struct wl_client *wl_client, uint32_t version, uint32_t id) override;
 };
 
 class HaikuServerDecoration: public OrgKdeKwinServerDecoration {

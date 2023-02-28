@@ -37,12 +37,24 @@ void SubsurfaceHook::HandleCommit()
 
 //#pragma mark - HaikuSubcompositor
 
-struct wl_global *HaikuSubcompositor::CreateGlobal(struct wl_display *display)
+class HaikuSubcompositor: public WlSubcompositor {
+protected:
+	virtual ~HaikuSubcompositor() = default;
+
+public:
+	void HandleGetSubsurface(uint32_t id, struct wl_resource *surface, struct wl_resource *parent) final;
+};
+
+
+HaikuSubcompositorGlobal *HaikuSubcompositorGlobal::Create(struct wl_display *display)
 {
-	return wl_global_create(display, &wl_subcompositor_interface, SUBCOMPOSITOR_VERSION, NULL, HaikuSubcompositor::Bind);
+	ObjectDeleter<HaikuSubcompositorGlobal> global(new(std::nothrow) HaikuSubcompositorGlobal());
+	if (!global.IsSet()) return NULL;
+	if (!global->Init(display, &wl_subcompositor_interface, SUBCOMPOSITOR_VERSION)) return NULL;
+	return global.Detach();
 }
 
-void HaikuSubcompositor::Bind(struct wl_client *wl_client, void *data, uint32_t version, uint32_t id)
+void HaikuSubcompositorGlobal::Bind(struct wl_client *wl_client, uint32_t version, uint32_t id)
 {
 	HaikuSubcompositor *manager = new(std::nothrow) HaikuSubcompositor();
 	if (manager == NULL) {
@@ -53,6 +65,7 @@ void HaikuSubcompositor::Bind(struct wl_client *wl_client, void *data, uint32_t 
 		return;
 	}
 }
+
 
 void HaikuSubcompositor::HandleGetSubsurface(uint32_t id, struct wl_resource *surface, struct wl_resource *parent)
 {

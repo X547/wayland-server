@@ -150,13 +150,13 @@ void HaikuXdgToplevel::HandleShowWindowMenu(struct wl_resource *seat, uint32_t s
 void HaikuXdgToplevel::HandleMove(struct wl_resource *_seat, uint32_t serial)
 {
 	HaikuSeat *seat = HaikuSeat::FromResource(_seat);
-	seat->DoTrack(HaikuSeat::trackMove);
+	seat->GetGlobal()->DoTrack(HaikuSeatGlobal::trackMove);
 }
 
 void HaikuXdgToplevel::HandleResize(struct wl_resource *_seat, uint32_t serial, uint32_t edges)
 {
 	HaikuSeat *seat = HaikuSeat::FromResource(_seat);
-	seat->DoTrack(HaikuSeat::trackResize, (XdgToplevel::ResizeEdge)edges);
+	seat->GetGlobal()->DoTrack(HaikuSeatGlobal::trackResize, (XdgToplevel::ResizeEdge)edges);
 }
 
 void HaikuXdgToplevel::HandleSetMaxSize(int32_t width, int32_t height)

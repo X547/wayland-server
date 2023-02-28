@@ -55,12 +55,25 @@ void HaikuRegion::HandleSubtract(int32_t x, int32_t y, int32_t width, int32_t he
 
 //#pragma mark - HaikuCompositor
 
-struct wl_global *HaikuCompositor::CreateGlobal(struct wl_display *display)
+class HaikuCompositor: public WlCompositor {
+protected:
+	virtual ~HaikuCompositor() = default;
+
+public:
+	void HandleCreateSurface(uint32_t id) override;
+	void HandleCreateRegion(uint32_t id) override;
+};
+
+
+HaikuCompositorGlobal *HaikuCompositorGlobal::Create(struct wl_display *display)
 {
-	return wl_global_create(display, &wl_compositor_interface, COMPOSITOR_VERSION, NULL, HaikuCompositor::Bind);
+	ObjectDeleter<HaikuCompositorGlobal> global(new(std::nothrow) HaikuCompositorGlobal());
+	if (!global.IsSet()) return NULL;
+	if (!global->Init(display, &wl_compositor_interface, COMPOSITOR_VERSION)) return NULL;
+	return global.Detach();
 }
 
-void HaikuCompositor::Bind(struct wl_client *wl_client, void *data, uint32_t version, uint32_t id)
+void HaikuCompositorGlobal::Bind(struct wl_client *wl_client, uint32_t version, uint32_t id)
 {
 	HaikuCompositor *manager = new(std::nothrow) HaikuCompositor();
 	if (manager == NULL) {
@@ -71,6 +84,7 @@ void HaikuCompositor::Bind(struct wl_client *wl_client, void *data, uint32_t ver
 		return;
 	}
 }
+
 
 void HaikuCompositor::HandleCreateSurface(uint32_t id)
 {
@@ -120,7 +134,7 @@ WaylandView::WaylandView(HaikuSurface *surface):
 void WaylandView::WindowActivated(bool active)
 {
 	WaylandEnv wlEnv(this);
-	HaikuSeat *seat = HaikuGetSeat(fSurface->Client());
+	HaikuSeatGlobal *seat = HaikuGetSeat(fSurface->Client());
 	if (seat == NULL) return;
 	seat->SetKeyboardFocus(fSurface, active);
 }
@@ -129,7 +143,7 @@ void WaylandView::MessageReceived(BMessage *msg)
 {
 	{
 		WaylandEnv wlEnv(this);
-		HaikuSeat *seat = HaikuGetSeat(fSurface->Client());
+		HaikuSeatGlobal *seat = HaikuGetSeat(fSurface->Client());
 	
 		if (seat != NULL && seat->MessageReceived(fSurface, msg)) {
 			return;
@@ -169,7 +183,7 @@ HaikuSurface::~HaikuSurface()
 		fView = NULL;
 	}
 */
-	HaikuSeat *seat = HaikuGetSeat(Client());
+	HaikuSeatGlobal *seat = HaikuGetSeat(Client());
 	if (seat != NULL) {
 		seat->SetPointerFocus(this, false, B_ORIGIN);
 		seat->SetKeyboardFocus(this, false);

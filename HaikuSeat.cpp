@@ -21,7 +21,7 @@ enum {
 	SEAT_VERSION = 8,
 };
 
-static HaikuSeat *sHaikuSeat = NULL;
+static HaikuSeatGlobal *sHaikuSeat = NULL;
 
 
 uint32_t FromHaikuKeyCode(uint32 haikuKey)
@@ -188,6 +188,11 @@ void SurfaceCursorHook::HandleCommit()
 
 //#pragma mark - HaikuPointer
 
+HaikuPointer::~HaikuPointer()
+{
+	fGlobal->fPointerIfaces.Remove(this);
+}
+
 void HaikuPointer::HandleSetCursor(uint32_t serial, struct wl_resource *_surface, int32_t hotspot_x, int32_t hotspot_y)
 {
 	HaikuSurface *surface = HaikuSurface::FromResource(_surface);
@@ -198,21 +203,26 @@ void HaikuPointer::HandleSetCursor(uint32_t serial, struct wl_resource *_surface
 	}
 }
 
-void HaikuPointer::HandleRelease()
+HaikuKeyboard::~HaikuKeyboard()
 {
+	fGlobal->fKeyboardIfaces.Remove(this);
 }
 
 
 //#pragma mark - HaikuSeat
 
-struct wl_global *HaikuSeat::CreateGlobal(struct wl_display *display)
+HaikuSeatGlobal *HaikuSeatGlobal::Create(struct wl_display *display)
 {
-	return wl_global_create(display, &wl_seat_interface, SEAT_VERSION, NULL, HaikuSeat::Bind);
+	ObjectDeleter<HaikuSeatGlobal> global(new(std::nothrow) HaikuSeatGlobal());
+	if (!global.IsSet()) return NULL;
+	if (!global->Init(display, &wl_seat_interface, SEAT_VERSION)) return NULL;
+	sHaikuSeat = global.Get();
+	return global.Detach();
 }
 
-void HaikuSeat::Bind(struct wl_client *wl_client, void *data, uint32_t version, uint32_t id)
+void HaikuSeatGlobal::Bind(struct wl_client *wl_client, uint32_t version, uint32_t id)
 {
-	HaikuSeat *seat = new(std::nothrow) HaikuSeat();
+	HaikuSeat *seat = new(std::nothrow) HaikuSeat(this);
 	if (seat == NULL) {
 		wl_client_post_no_memory(wl_client);
 		return;
@@ -220,54 +230,70 @@ void HaikuSeat::Bind(struct wl_client *wl_client, void *data, uint32_t version, 
 	if (!seat->Init(wl_client, version, id)) {
 		return;
 	}
-	sHaikuSeat = seat;
-
-	seat->SendCapabilities(capabilityPointer | capabilityKeyboard);
+	seat->SendCapabilities(WlSeat::capabilityPointer | WlSeat::capabilityKeyboard);
 }
 
-uint32_t HaikuSeat::NextSerial()
+
+uint32_t HaikuSeatGlobal::NextSerial()
 {
 	return (uint32_t)atomic_add((int32*)&fSerial, 1);
 }
 
-void HaikuSeat::SetPointerFocus(HaikuSurface *surface, bool setFocus, const BPoint &where)
+void HaikuSeatGlobal::SetPointerFocus(HaikuSurface *surface, bool setFocus, const BPoint &where)
 {
 	if (setFocus) {
 		if (fPointerFocus != surface) {
 			if (fPointerFocus != NULL) {
-				fPointer->SendLeave(NextSerial(), fPointerFocus->ToResource());
-				fPointer->SendFrame();
+				for (HaikuPointer *pointer = fPointerIfaces.First(); pointer != NULL; pointer = fPointerIfaces.GetNext(pointer)) {
+					if (pointer->Client() != fPointerFocus->Client()) continue;
+					pointer->SendLeave(NextSerial(), fPointerFocus->ToResource());
+					pointer->SendFrame();
+				}
 			}
 			fPointerFocus = surface;
-			fPointer->SendEnter(NextSerial(), surface->ToResource(), wl_fixed_from_double(where.x), wl_fixed_from_double(where.y));
-			fPointer->SendFrame();
+			for (HaikuPointer *pointer = fPointerIfaces.First(); pointer != NULL; pointer = fPointerIfaces.GetNext(pointer)) {
+				if (pointer->Client() != surface->Client()) continue;
+				pointer->SendEnter(NextSerial(), surface->ToResource(), wl_fixed_from_double(where.x), wl_fixed_from_double(where.y));
+				pointer->SendFrame();
+			}
 		}
 	} else if (fPointerFocus == surface) {
-		fPointer->SendLeave(NextSerial(), fPointerFocus->ToResource());
-		fPointer->SendFrame();
+		for (HaikuPointer *pointer = fPointerIfaces.First(); pointer != NULL; pointer = fPointerIfaces.GetNext(pointer)) {
+			if (pointer->Client() != fPointerFocus->Client()) continue;
+			pointer->SendLeave(NextSerial(), fPointerFocus->ToResource());
+			pointer->SendFrame();
+		}		
 		fPointerFocus = NULL;
 	}
 }
 
-void HaikuSeat::SetKeyboardFocus(HaikuSurface *surface, bool setFocus)
+void HaikuSeatGlobal::SetKeyboardFocus(HaikuSurface *surface, bool setFocus)
 {
-	if (fKeyboard == NULL) return;
 	if (setFocus) {
 		if (fKeyboardFocus != surface) {
 			if (fKeyboardFocus != NULL) {
-				fKeyboard->SendLeave(NextSerial(), fKeyboardFocus->ToResource());
+				for (HaikuKeyboard *keyboard = fKeyboardIfaces.First(); keyboard != NULL; keyboard = fKeyboardIfaces.GetNext(keyboard)) {
+					if (keyboard->Client() != fKeyboardFocus->Client()) continue;
+					keyboard->SendLeave(NextSerial(), fKeyboardFocus->ToResource());
+				}
 			}
 			fKeyboardFocus = surface;
 			struct wl_array keys{};
-			fKeyboard->SendEnter(NextSerial(), surface->ToResource(), &keys);
+			for (HaikuKeyboard *keyboard = fKeyboardIfaces.First(); keyboard != NULL; keyboard = fKeyboardIfaces.GetNext(keyboard)) {
+				if (keyboard->Client() != surface->Client()) continue;
+				keyboard->SendEnter(NextSerial(), surface->ToResource(), &keys);
+			}			
 		}
 	} else if (fKeyboardFocus == surface) {
-		fKeyboard->SendLeave(NextSerial(), fKeyboardFocus->ToResource());
+		for (HaikuKeyboard *keyboard = fKeyboardIfaces.First(); keyboard != NULL; keyboard = fKeyboardIfaces.GetNext(keyboard)) {
+			if (keyboard->Client() != fKeyboardFocus->Client()) continue;
+			keyboard->SendLeave(NextSerial(), fKeyboardFocus->ToResource());
+		}
 		fKeyboardFocus = NULL;
 	}
 }
 
-void HaikuSeat::DoTrack(TrackId id, XdgToplevel::ResizeEdge resizeEdge)
+void HaikuSeatGlobal::DoTrack(TrackId id, XdgToplevel::ResizeEdge resizeEdge)
 {
 	if (fTrack.id != trackClient || fOldMouseBtns == 0) return;
 	fTrack.id = id;
@@ -279,7 +305,7 @@ void HaikuSeat::DoTrack(TrackId id, XdgToplevel::ResizeEdge resizeEdge)
 	}
 }
 
-bool HaikuSeat::MessageReceived(HaikuSurface *surface, BMessage *msg)
+bool HaikuSeatGlobal::MessageReceived(HaikuSurface *surface, BMessage *msg)
 {
 	// TODO: properly set pointer focus when new window created
 	// TODO: fix global stopping of pointer input after GTK combo box selection
@@ -308,44 +334,59 @@ bool HaikuSeat::MessageReceived(HaikuSurface *surface, BMessage *msg)
 		case B_KEY_UP:
 		case B_UNMAPPED_KEY_DOWN:
 		case B_UNMAPPED_KEY_UP: {
-			if (fKeyboard == NULL || fKeyboardFocus != surface) return false;
+			if (fKeyboardFocus != surface) return false;
 			int32 key;
 			msg->FindInt32("key", &key);
 			uint32_t state = (msg->what == B_KEY_UP || msg->what == B_UNMAPPED_KEY_UP) ? WlKeyboard::keyStateReleased : WlKeyboard::keyStatePressed;
 
 			uint32_t wlKey = FromHaikuKeyCode(key);
-			fKeyboard->SendKey(NextSerial(), system_time()/1000, wlKey, state);
+			for (HaikuKeyboard *keyboard = fKeyboardIfaces.First(); keyboard != NULL; keyboard = fKeyboardIfaces.GetNext(keyboard)) {
+				if (keyboard->Client() != fKeyboardFocus->Client()) continue;
+				keyboard->SendKey(NextSerial(), system_time()/1000, wlKey, state);
+			}
 			return true;
 		}
 		case B_MODIFIERS_CHANGED: {
-			if (fKeyboard == NULL || fKeyboardFocus != surface) return false;
+			if (fKeyboardFocus != surface) return false;
 			uint32 modifiers;
 			if (msg->FindInt32("modifiers", (int32*)&modifiers) < B_OK) modifiers = 0;
-			fKeyboard->SendModifiers(NextSerial(), FromHaikuModifiers(modifiers), 0, 0, 0);
+			for (HaikuKeyboard *keyboard = fKeyboardIfaces.First(); keyboard != NULL; keyboard = fKeyboardIfaces.GetNext(keyboard)) {
+				if (keyboard->Client() != fKeyboardFocus->Client()) continue;
+				keyboard->SendModifiers(NextSerial(), FromHaikuModifiers(modifiers), 0, 0, 0);
+			}
 			return true;
 		}
 		case B_MOUSE_WHEEL_CHANGED: {
-			if (fPointer == NULL || fPointerFocus != surface) return false;
+			if (fPointerFocus != surface) return false;
 			bigtime_t when;
 			float dx, dy;
 			if (msg->FindInt64("when", &when) < B_OK) when = system_time();
 			if (msg->FindFloat("be:wheel_delta_x", &dx) < B_OK) dx = 0;
 			if (msg->FindFloat("be:wheel_delta_y", &dy) < B_OK) dy = 0;
 			if (dx != 0) {
-				fPointer->SendAxisSource(WlPointer::axisSourceWheel);
-				fPointer->SendAxis(when/1000, WlPointer::axisHorizontalScroll, wl_fixed_from_double(dx*10.0));
-				fPointer->SendAxisDiscrete(WlPointer::axisHorizontalScroll, dx);
+				for (HaikuPointer *pointer = fPointerIfaces.First(); pointer != NULL; pointer = fPointerIfaces.GetNext(pointer)) {
+					if (pointer->Client() != fPointerFocus->Client()) continue;
+					pointer->SendAxisSource(WlPointer::axisSourceWheel);
+					pointer->SendAxis(when/1000, WlPointer::axisHorizontalScroll, wl_fixed_from_double(dx*10.0));
+					pointer->SendAxisDiscrete(WlPointer::axisHorizontalScroll, dx);
+				}
 			}
 			if (dy != 0) {
-				fPointer->SendAxisSource(WlPointer::axisSourceWheel);
-				fPointer->SendAxis(when/1000, WlPointer::axisVerticalScroll, wl_fixed_from_double(dy*10.0));
-				fPointer->SendAxisDiscrete(WlPointer::axisVerticalScroll, dy);
+				for (HaikuPointer *pointer = fPointerIfaces.First(); pointer != NULL; pointer = fPointerIfaces.GetNext(pointer)) {
+					if (pointer->Client() != fPointerFocus->Client()) continue;
+					pointer->SendAxisSource(WlPointer::axisSourceWheel);
+					pointer->SendAxis(when/1000, WlPointer::axisVerticalScroll, wl_fixed_from_double(dy*10.0));
+					pointer->SendAxisDiscrete(WlPointer::axisVerticalScroll, dy);
+				}
 			}
-			fPointer->SendFrame();
+			for (HaikuPointer *pointer = fPointerIfaces.First(); pointer != NULL; pointer = fPointerIfaces.GetNext(pointer)) {
+				if (pointer->Client() != fPointerFocus->Client()) continue;
+				pointer->SendFrame();
+			}
 			return true;
 		}
 		case B_MOUSE_DOWN: {
-			if (fPointer == NULL || fPointerFocus != surface) return false;
+			if (fPointerFocus != surface) return false;
 			bigtime_t when;
 			BPoint where;
 			uint32 btns;
@@ -365,17 +406,23 @@ bool HaikuSeat::MessageReceived(HaikuSurface *surface, BMessage *msg)
 					uint32 btnsDown = btns & (~oldBtns);
 					for (uint32 i = 0; i < 32; i++) {
 						if (((1 << i) & btnsDown) != 0) {
-							fPointer->SendButton(NextSerial(), when/1000, FromHaikuMouseBtnCode(i), WlPointer::buttonStatePressed);
+							for (HaikuPointer *pointer = fPointerIfaces.First(); pointer != NULL; pointer = fPointerIfaces.GetNext(pointer)) {
+								if (pointer->Client() != fPointerFocus->Client()) continue;
+								pointer->SendButton(NextSerial(), when/1000, FromHaikuMouseBtnCode(i), WlPointer::buttonStatePressed);
+							}							
 						}
 					}
-					fPointer->SendFrame();
+					for (HaikuPointer *pointer = fPointerIfaces.First(); pointer != NULL; pointer = fPointerIfaces.GetNext(pointer)) {
+						if (pointer->Client() != fPointerFocus->Client()) continue;
+						pointer->SendFrame();
+					}
 					break;
 				}
 			}
 			return true;
 		}
 		case B_MOUSE_UP: {
-			if (fPointer == NULL || fPointerFocus != surface) return false;
+			if (fPointerFocus != surface) return false;
 			bigtime_t when;
 			uint32 btns;
 			msg->FindInt64("when", &when);
@@ -391,17 +438,23 @@ bool HaikuSeat::MessageReceived(HaikuSurface *surface, BMessage *msg)
 					uint32 btnsUp = oldBtns & (~btns);
 					for (uint32 i = 0; i < 32; i++) {
 						if (((1 << i) & btnsUp) != 0) {
-							fPointer->SendButton(NextSerial(), when/1000, FromHaikuMouseBtnCode(i), WlPointer::buttonStateReleased);
+							for (HaikuPointer *pointer = fPointerIfaces.First(); pointer != NULL; pointer = fPointerIfaces.GetNext(pointer)) {
+								if (pointer->Client() != fPointerFocus->Client()) continue;
+								pointer->SendButton(NextSerial(), when/1000, FromHaikuMouseBtnCode(i), WlPointer::buttonStateReleased);
+							}
 						}
 					}
-					fPointer->SendFrame();
+					for (HaikuPointer *pointer = fPointerIfaces.First(); pointer != NULL; pointer = fPointerIfaces.GetNext(pointer)) {
+						if (pointer->Client() != fPointerFocus->Client()) continue;
+						pointer->SendFrame();
+					}
 					break;
 				}
 			}
 			return true;
 		}
 		case B_MOUSE_MOVED: {
-			if (fPointer == NULL || fPointerFocus != surface) return false;
+			if (fPointerFocus != surface) return false;
 			bigtime_t when;
 			BPoint where;
 			uint32 btns;
@@ -410,8 +463,11 @@ bool HaikuSeat::MessageReceived(HaikuSurface *surface, BMessage *msg)
 			switch (fTrack.id) {
 				case trackNone:
 				case trackClient: {
-					fPointer->SendMotion(when / 1000, wl_fixed_from_double(where.x), wl_fixed_from_double(where.y));
-					fPointer->SendFrame();
+					for (HaikuPointer *pointer = fPointerIfaces.First(); pointer != NULL; pointer = fPointerIfaces.GetNext(pointer)) {
+						if (pointer->Client() != fPointerFocus->Client()) continue;
+						pointer->SendMotion(when / 1000, wl_fixed_from_double(where.x), wl_fixed_from_double(where.y));
+						pointer->SendFrame();
+					}
 					break;
 				}
 				case trackMove: {
@@ -460,7 +516,7 @@ bool HaikuSeat::MessageReceived(HaikuSurface *surface, BMessage *msg)
 	return false;
 }
 
-void HaikuSeat::UpdateKeymap()
+void HaikuSeatGlobal::UpdateKeymap()
 {
 	int fd;
 	if (ProduceXkbKeymap(fd) < B_OK) {
@@ -470,13 +526,15 @@ void HaikuSeat::UpdateKeymap()
 	FileDescriptorCloser fdCloser(fd);
 	struct stat st{};
 	fstat(fd, &st);
-	fKeyboard->SendKeymap(WlKeyboard::keymapFormatXkbV1, fd, st.st_size);
+	for (HaikuKeyboard *keyboard = fKeyboardIfaces.First(); keyboard != NULL; keyboard = fKeyboardIfaces.GetNext(keyboard)) {
+		keyboard->SendKeymap(WlKeyboard::keymapFormatXkbV1, fd, st.st_size);
+	}
 }
+
 
 void HaikuSeat::HandleGetPointer(uint32_t id)
 {
-	// TODO: allow creating multiple interface instances?
-	HaikuPointer *pointer = new(std::nothrow) HaikuPointer();
+	HaikuPointer *pointer = new(std::nothrow) HaikuPointer(fGlobal);
 	if (pointer == NULL) {
 		wl_client_post_no_memory(Client());
 		return;
@@ -484,13 +542,13 @@ void HaikuSeat::HandleGetPointer(uint32_t id)
 	if (!pointer->Init(Client(), wl_resource_get_version(ToResource()), id)) {
 		return;
 	}
-	fPointer = pointer;
+	fGlobal->fPointerIfaces.Insert(pointer);
 }
 
 void HaikuSeat::HandleGetKeyboard(uint32_t id)
 {
 	// TODO: allow creating multiple interface instances?
-	HaikuKeyboard *keyboard = new(std::nothrow) HaikuKeyboard();
+	HaikuKeyboard *keyboard = new(std::nothrow) HaikuKeyboard(fGlobal);
 	if (keyboard == NULL) {
 		wl_client_post_no_memory(Client());
 		return;
@@ -498,9 +556,9 @@ void HaikuSeat::HandleGetKeyboard(uint32_t id)
 	if (!keyboard->Init(Client(), wl_resource_get_version(ToResource()), id)) {
 		return;
 	}
-	fKeyboard = keyboard;
+	fGlobal->fKeyboardIfaces.Insert(keyboard);
 
-	UpdateKeymap();
+	fGlobal->UpdateKeymap();
 }
 
 void HaikuSeat::HandleGetTouch(uint32_t id)
@@ -509,7 +567,7 @@ void HaikuSeat::HandleGetTouch(uint32_t id)
 }
 
 
-HaikuSeat *HaikuGetSeat(struct wl_client *wl_client)
+HaikuSeatGlobal *HaikuGetSeat(struct wl_client *wl_client)
 {
 	return sHaikuSeat;
 }

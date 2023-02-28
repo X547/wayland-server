@@ -1,12 +1,19 @@
 #pragma once
 
 #include "XdgShell.h"
+#include "WlGlobal.h"
 
 struct HaikuXdgShell;
 
-struct HaikuXdgShell {
+class HaikuXdgShell: public WlGlocal {
+private:
 	struct wl_global *global;
 	struct wl_list clients;
+
+public:
+	static HaikuXdgShell *Create(struct wl_display *display);
+	virtual ~HaikuXdgShell() = default;
+	void Bind(struct wl_client *wl_client, uint32_t version, uint32_t id) override;
 };
 
 class HaikuXdgWmBase: public XdgWmBase {
@@ -14,8 +21,6 @@ public:
 	HaikuXdgShell *shell;
 
 	struct wl_list link; // wlr_xdg_shell.clients
-
-	static void Bind(struct wl_client *wl_client, void *data, uint32_t version, uint32_t id);
 
 public:
 	static struct wl_global *CreateGlobal(struct wl_display *display);

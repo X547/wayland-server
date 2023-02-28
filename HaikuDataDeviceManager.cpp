@@ -221,12 +221,25 @@ void HaikuDataDevice::HandleSetSelection(struct wl_resource *_source, uint32_t s
 
 //#pragma mark - HaikuDataDeviceManager
 
-struct wl_global *HaikuDataDeviceManager::CreateGlobal(struct wl_display *display)
+class HaikuDataDeviceManager: public WlDataDeviceManager {
+private:
+	virtual ~HaikuDataDeviceManager() = default;
+
+public:
+	void HandleCreateDataSource(uint32_t id) final;
+	void HandleGetDataDevice(uint32_t id, struct wl_resource *seat) final;
+};
+
+
+HaikuDataDeviceManagerGlobal *HaikuDataDeviceManagerGlobal::Create(struct wl_display *display)
 {
-	return wl_global_create(display, &wl_data_device_manager_interface, DATA_DEVICE_MANAGER_VERSION, NULL, HaikuDataDeviceManager::Bind);
+	ObjectDeleter<HaikuDataDeviceManagerGlobal> global(new(std::nothrow) HaikuDataDeviceManagerGlobal());
+	if (!global.IsSet()) return NULL;
+	if (!global->Init(display, &wl_data_device_manager_interface, DATA_DEVICE_MANAGER_VERSION)) return NULL;
+	return global.Detach();
 }
 
-void HaikuDataDeviceManager::Bind(struct wl_client *wl_client, void *data, uint32_t version, uint32_t id)
+void HaikuDataDeviceManagerGlobal::Bind(struct wl_client *wl_client, uint32_t version, uint32_t id)
 {
 	HaikuDataDeviceManager *manager = new(std::nothrow) HaikuDataDeviceManager();
 	if (manager == NULL) {
@@ -237,6 +250,7 @@ void HaikuDataDeviceManager::Bind(struct wl_client *wl_client, void *data, uint3
 		return;
 	}
 }
+
 
 void HaikuDataDeviceManager::HandleCreateDataSource(uint32_t id)
 {

@@ -1,24 +1,50 @@
 #pragma once
 #include "Wayland.h"
+#include "WlGlobal.h"
 #include "XdgShell.h"
 #include <SupportDefs.h>
 #include <Point.h>
 #include <Locker.h>
+#include <private/kernel/util/DoublyLinkedList.h>
 
 
 class BMessage;
 class HaikuSurface;
+class HaikuSeatGlobal;
 
 class HaikuPointer: public WlPointer {
+private:
+	HaikuSeatGlobal *fGlobal;
+	DoublyLinkedListLink<HaikuPointer> fLink;
+
+protected:
+	virtual ~HaikuPointer();
+
 public:
+	typedef DoublyLinkedList<HaikuPointer, DoublyLinkedListMemberGetLink<HaikuPointer, &HaikuPointer::fLink>> List;
+
+	HaikuPointer(HaikuSeatGlobal *global): fGlobal(global) {}
+	HaikuSeatGlobal *GetGlobal() const {return fGlobal;}
+
 	void HandleSetCursor(uint32_t serial, struct wl_resource *surface, int32_t hotspot_x, int32_t hotspot_y) final;
-	void HandleRelease() final;
 };
 
 class HaikuKeyboard: public WlKeyboard {
+private:
+	HaikuSeatGlobal *fGlobal;
+	DoublyLinkedListLink<HaikuKeyboard> fLink;
+
+protected:
+	virtual ~HaikuKeyboard();
+
+public:
+	typedef DoublyLinkedList<HaikuKeyboard, DoublyLinkedListMemberGetLink<HaikuKeyboard, &HaikuKeyboard::fLink>> List;
+
+	HaikuKeyboard(HaikuSeatGlobal *global): fGlobal(global) {}
+	HaikuSeatGlobal *GetGlobal() const {return fGlobal;}
 };
 
-class HaikuSeat: public WlSeat {
+class HaikuSeatGlobal: public WlGlocal {
 public:
 	enum TrackId {
 		trackNone,
@@ -27,6 +53,10 @@ public:
 		trackResize,
 	};
 private:
+	friend class HaikuSeat;
+	friend class HaikuPointer;
+	friend class HaikuKeyboard;
+
 	struct Track {
 		TrackId id = trackNone;
 		BPoint origin;
@@ -35,28 +65,38 @@ private:
 	};
 
 	uint32_t fSerial = 1;
-	HaikuPointer *fPointer{};
-	HaikuKeyboard *fKeyboard{};
+	HaikuPointer::List fPointerIfaces{};
+	HaikuKeyboard::List fKeyboardIfaces{};
 	HaikuSurface *fPointerFocus{};
 	HaikuSurface *fKeyboardFocus{};
 	uint32 fOldMouseBtns{};
 	Track fTrack;
 
-	static void Bind(struct wl_client *wl_client, void *data, uint32_t version, uint32_t id);
+	uint32_t NextSerial();
 
 public:
-	static struct wl_global *CreateGlobal(struct wl_display *display);
-	static HaikuSeat *FromResource(struct wl_resource *resource) {return (HaikuSeat*)WlResource::FromResource(resource);}
-
-	uint32_t NextSerial();
-	HaikuPointer *Pointer() {return fPointer;}
-	HaikuKeyboard *Keyboard() {return fKeyboard;}
+	static HaikuSeatGlobal *Create(struct wl_display *display);
+	virtual ~HaikuSeatGlobal() = default;
+	void Bind(struct wl_client *wl_client, uint32_t version, uint32_t id) override;
 
 	void SetPointerFocus(HaikuSurface *surface, bool setFocus, const BPoint &where);
 	void SetKeyboardFocus(HaikuSurface *surface, bool setFocus);
 	void DoTrack(TrackId id, XdgToplevel::ResizeEdge resizeEdge = XdgToplevel::resizeEdgeNone);
 	bool MessageReceived(HaikuSurface *surface, BMessage *msg);
 	void UpdateKeymap();
+};
+
+class HaikuSeat: public WlSeat {
+private:
+	HaikuSeatGlobal *fGlobal;
+
+protected:
+	virtual ~HaikuSeat() = default;
+
+public:
+	HaikuSeat(HaikuSeatGlobal *global): fGlobal(global) {}
+	HaikuSeatGlobal *GetGlobal() const {return fGlobal;}
+	static HaikuSeat *FromResource(struct wl_resource *resource) {return (HaikuSeat*)WlResource::FromResource(resource);}
 
 	void HandleGetPointer(uint32_t id) final;
 	void HandleGetKeyboard(uint32_t id) final;
@@ -64,4 +104,4 @@ public:
 };
 
 
-HaikuSeat *HaikuGetSeat(struct wl_client *wl_client);
+HaikuSeatGlobal *HaikuGetSeat(struct wl_client *wl_client);

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Wayland.h"
+#include "WlGlobal.h"
 #include "HaikuSubcompositor.h"
 #include <AutoDeleter.h>
 #include <Point.h>
@@ -14,16 +15,11 @@ class BWindow;
 class BView;
 
 
-class HaikuCompositor: public WlCompositor {
+class HaikuCompositorGlobal: public WlGlocal {
 public:
-	static void Bind(struct wl_client *wl_client, void *data, uint32_t version, uint32_t id);
-
-public:
-	static struct wl_global *CreateGlobal(struct wl_display *display);
-	static HaikuCompositor *FromResource(struct wl_resource *resource) {return (HaikuCompositor*)WlResource::FromResource(resource);}
-
-	void HandleCreateSurface(uint32_t id) override;
-	void HandleCreateRegion(uint32_t id) override;
+	static HaikuCompositorGlobal *Create(struct wl_display *display);
+	virtual ~HaikuCompositorGlobal() = default;
+	void Bind(struct wl_client *wl_client, uint32_t version, uint32_t id) override;
 };
 
 

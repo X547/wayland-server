@@ -1,20 +1,17 @@
 #pragma once
 
 #include "Wayland.h"
+#include "WlGlobal.h"
 #include <private/kernel/util/DoublyLinkedList.h>
 
 
 class HaikuSurface;
 
-class HaikuSubcompositor: public WlSubcompositor {
+class HaikuSubcompositorGlobal: public WlGlocal {
 public:
-	static void Bind(struct wl_client *wl_client, void *data, uint32_t version, uint32_t id);
-
-public:
-	static struct wl_global *CreateGlobal(struct wl_display *display);
-	static HaikuSubcompositor *FromResource(struct wl_resource *resource) {return (HaikuSubcompositor*)WlResource::FromResource(resource);}
-
-	void HandleGetSubsurface(uint32_t id, struct wl_resource *surface, struct wl_resource *parent) final;
+	static HaikuSubcompositorGlobal *Create(struct wl_display *display);
+	virtual ~HaikuSubcompositorGlobal() = default;
+	void Bind(struct wl_client *wl_client, uint32_t version, uint32_t id) override;
 };
 
 class HaikuSubsurface: public WlSubsurface {

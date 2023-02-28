@@ -1,5 +1,6 @@
 #include "HaikuOutput.h"
 #include <Screen.h>
+#include <AutoDeleter.h>
 
 extern const struct wl_interface wl_output_interface;
 
@@ -9,12 +10,21 @@ enum {
 };
 
 
-struct wl_global *HaikuOutput::CreateGlobal(struct wl_display *display)
+class HaikuOutput: public WlOutput {
+protected:
+	virtual ~HaikuOutput() = default;
+};
+
+
+HaikuOutputGlobal *HaikuOutputGlobal::Create(struct wl_display *display)
 {
-	return wl_global_create(display, &wl_output_interface, OUTPUT_VERSION, NULL, HaikuOutput::Bind);
+	ObjectDeleter<HaikuOutputGlobal> global(new(std::nothrow) HaikuOutputGlobal());
+	if (!global.IsSet()) return NULL;
+	if (!global->Init(display, &wl_output_interface, OUTPUT_VERSION)) return NULL;
+	return global.Detach();
 }
 
-void HaikuOutput::Bind(struct wl_client *wl_client, void *data, uint32_t version, uint32_t id)
+void HaikuOutputGlobal::Bind(struct wl_client *wl_client, uint32_t version, uint32_t id)
 {
 	HaikuOutput *output = new(std::nothrow) HaikuOutput();
 	if (output == NULL) {
@@ -28,8 +38,8 @@ void HaikuOutput::Bind(struct wl_client *wl_client, void *data, uint32_t version
 	BScreen screen;
 	int32_t width = (int32_t)screen.Frame().Width() + 1;
 	int32_t height = (int32_t)screen.Frame().Height() + 1;
-	output->SendGeometry(0, 0, (float)width * 0.3528, (float)height * 0.3528, subpixelUnknown, "Unknown make", "Unknown model", transformNormal);
-	output->SendMode(modeCurrent | modePreferred, width, height, 60000);
+	output->SendGeometry(0, 0, (float)width * 0.3528, (float)height * 0.3528, WlOutput::subpixelUnknown, "Unknown make", "Unknown model", WlOutput::transformNormal);
+	output->SendMode(WlOutput::modeCurrent | WlOutput::modePreferred, width, height, 60000);
 	output->SendScale(1);
 	output->SendDone();
 }

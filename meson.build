@@ -92,6 +92,7 @@ shared_library('wayland-server-inproc',
 	[
 		'WaylandServer.cpp',
 		'WlResource.cpp',
+		'WlGlobal.cpp',
 		'HaikuCompositor.cpp',
 		'HaikuSubcompositor.cpp',
 		'HaikuXdgShell.cpp',

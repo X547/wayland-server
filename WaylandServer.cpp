@@ -34,6 +34,7 @@ typedef int (*client_enqueue_proc)(void *client_display, struct wl_closure *clos
 
 
 void *gClientDisplay;
+static struct wl_display *sDisplay;
 
 struct HaikuSurface;
 
@@ -109,7 +110,7 @@ void Application::MessageReceived(BMessage *msg)
 	case B_KEY_MAP_LOADED:
 		if (fClient == NULL) return;
 		WaylandEnv env(this);
-		HaikuSeat *seat = HaikuGetSeat(fClient);
+		HaikuSeatGlobal *seat = HaikuGetSeat(fClient);
 		if (seat == NULL) return;
 		seat->UpdateKeymap();
 		return;
@@ -132,20 +133,22 @@ extern "C" _EXPORT int wl_ips_client_connected(void **clientOut, void *clientDis
 	}
 
 	fprintf(stderr, "wl_ips_client_connected\n");
-	struct wl_display *display = wl_display_create();
-	fprintf(stderr, "display: %p\n", display);
-	struct wl_client *client = wl_client_create_ips(display, clientDisplay, display_enqueue);
+	if (sDisplay == NULL) {
+		sDisplay = wl_display_create();
+
+		Assert(wl_display_init_shm(sDisplay) == 0);
+		Assert(HaikuCompositorGlobal::Create(sDisplay) != NULL);
+		Assert(HaikuSubcompositorGlobal::Create(sDisplay) != NULL);
+		Assert(HaikuOutputGlobal::Create(sDisplay) != NULL);
+		Assert(HaikuDataDeviceManagerGlobal::Create(sDisplay) != NULL);
+		Assert(HaikuSeatGlobal::Create(sDisplay) != NULL);
+		Assert(HaikuXdgShell::Create(sDisplay) != NULL);
+		Assert(HaikuServerDecorationManagerGlobal::Create(sDisplay) != NULL);
+	}
+	fprintf(stderr, "display: %p\n", sDisplay);
+	struct wl_client *client = wl_client_create_ips(sDisplay, clientDisplay, display_enqueue);
 	fprintf(stderr, "client: %p\n", client);
 	static_cast<Application*>(be_app)->AddClient(client);
-
-	Assert(wl_display_init_shm(display) == 0);
-	Assert(HaikuCompositor::CreateGlobal(display) != NULL);
-	Assert(HaikuSubcompositor::CreateGlobal(display) != NULL);
-	Assert(HaikuOutput::CreateGlobal(display) != NULL);
-	Assert(HaikuDataDeviceManager::CreateGlobal(display) != NULL);
-	Assert(HaikuSeat::CreateGlobal(display) != NULL);
-	Assert(HaikuXdgWmBase::CreateGlobal(display) != NULL);
-	Assert(HaikuServerDecorationManager::CreateGlobal(display) != NULL);
 
 	gClientDisplay = clientDisplay;
 	*clientOut = client;

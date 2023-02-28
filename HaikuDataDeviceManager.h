@@ -1,5 +1,6 @@
 #pragma once
 #include "Wayland.h"
+#include "WlGlobal.h"
 #include <set>
 #include <string>
 #include <vector>
@@ -70,13 +71,9 @@ public:
 	void HandleSetSelection(struct wl_resource *source, uint32_t serial) final;
 };
 
-class HaikuDataDeviceManager: public WlDataDeviceManager {
-private:
-	static void Bind(struct wl_client *wl_client, void *data, uint32_t version, uint32_t id);
-
+class HaikuDataDeviceManagerGlobal: public WlGlocal {
 public:
-	static struct wl_global *CreateGlobal(struct wl_display *display);
-
-	void HandleCreateDataSource(uint32_t id) final;
-	void HandleGetDataDevice(uint32_t id, struct wl_resource *seat) final;
+	static HaikuDataDeviceManagerGlobal *Create(struct wl_display *display);
+	virtual ~HaikuDataDeviceManagerGlobal() = default;
+	void Bind(struct wl_client *wl_client, uint32_t version, uint32_t id) override;
 };

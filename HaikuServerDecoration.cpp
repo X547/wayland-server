@@ -15,12 +15,24 @@ enum {
 
 //#pragma mark - HaikuServerDecorationManager
 
-struct wl_global *HaikuServerDecorationManager::CreateGlobal(struct wl_display *display)
+class HaikuServerDecorationManager: public OrgKdeKwinServerDecorationManager {
+protected:
+	virtual ~HaikuServerDecorationManager() = default;
+
+public:
+	void HandleCreate(uint32_t id, struct wl_resource *surface) final;
+};
+
+
+HaikuServerDecorationManagerGlobal *HaikuServerDecorationManagerGlobal::Create(struct wl_display *display)
 {
-	return wl_global_create(display, &org_kde_kwin_server_decoration_manager_interface, SERVER_DECORATION_VERSION, NULL, HaikuServerDecorationManager::Bind);
+	ObjectDeleter<HaikuServerDecorationManagerGlobal> global(new(std::nothrow) HaikuServerDecorationManagerGlobal());
+	if (!global.IsSet()) return NULL;
+	if (!global->Init(display, &org_kde_kwin_server_decoration_manager_interface, SERVER_DECORATION_VERSION)) return NULL;
+	return global.Detach();
 }
 
-void HaikuServerDecorationManager::Bind(struct wl_client *wl_client, void *data, uint32_t version, uint32_t id)
+void HaikuServerDecorationManagerGlobal::Bind(struct wl_client *wl_client, uint32_t version, uint32_t id)
 {
 	HaikuServerDecorationManager *manager = new(std::nothrow) HaikuServerDecorationManager();
 	if (manager == NULL) {
@@ -32,6 +44,7 @@ void HaikuServerDecorationManager::Bind(struct wl_client *wl_client, void *data,
 	}
 	manager->SendDefaultMode(OrgKdeKwinServerDecorationManager::modeServer);
 }
+
 
 void HaikuServerDecorationManager::HandleCreate(uint32_t id, struct wl_resource *surface_resource)
 {

@@ -1,11 +1,11 @@
 #pragma once
 #include "Wayland.h"
+#include "WlGlobal.h"
 
 
-class HaikuOutput: public WlOutput {
-private:
-	static void Bind(struct wl_client *wl_client, void *data, uint32_t version, uint32_t id);
-
+class HaikuOutputGlobal: public WlGlocal {
 public:
-	static struct wl_global *CreateGlobal(struct wl_display *display);
+	static HaikuOutputGlobal *Create(struct wl_display *display);
+	virtual ~HaikuOutputGlobal() = default;
+	void Bind(struct wl_client *wl_client, uint32_t version, uint32_t id) override;
 };
