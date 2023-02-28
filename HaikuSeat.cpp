@@ -262,7 +262,7 @@ void HaikuSeatGlobal::SetPointerFocus(HaikuSurface *surface, bool setFocus, cons
 			if (pointer->Client() != fPointerFocus->Client()) continue;
 			pointer->SendLeave(NextSerial(), fPointerFocus->ToResource());
 			pointer->SendFrame();
-		}		
+		}
 		fPointerFocus = NULL;
 	}
 }
@@ -282,7 +282,7 @@ void HaikuSeatGlobal::SetKeyboardFocus(HaikuSurface *surface, bool setFocus)
 			for (HaikuKeyboard *keyboard = fKeyboardIfaces.First(); keyboard != NULL; keyboard = fKeyboardIfaces.GetNext(keyboard)) {
 				if (keyboard->Client() != surface->Client()) continue;
 				keyboard->SendEnter(NextSerial(), surface->ToResource(), &keys);
-			}			
+			}
 		}
 	} else if (fKeyboardFocus == surface) {
 		for (HaikuKeyboard *keyboard = fKeyboardIfaces.First(); keyboard != NULL; keyboard = fKeyboardIfaces.GetNext(keyboard)) {
@@ -409,7 +409,7 @@ bool HaikuSeatGlobal::MessageReceived(HaikuSurface *surface, BMessage *msg)
 							for (HaikuPointer *pointer = fPointerIfaces.First(); pointer != NULL; pointer = fPointerIfaces.GetNext(pointer)) {
 								if (pointer->Client() != fPointerFocus->Client()) continue;
 								pointer->SendButton(NextSerial(), when/1000, FromHaikuMouseBtnCode(i), WlPointer::buttonStatePressed);
-							}							
+							}
 						}
 					}
 					for (HaikuPointer *pointer = fPointerIfaces.First(); pointer != NULL; pointer = fPointerIfaces.GetNext(pointer)) {
@@ -547,7 +547,6 @@ void HaikuSeat::HandleGetPointer(uint32_t id)
 
 void HaikuSeat::HandleGetKeyboard(uint32_t id)
 {
-	// TODO: allow creating multiple interface instances?
 	HaikuKeyboard *keyboard = new(std::nothrow) HaikuKeyboard(fGlobal);
 	if (keyboard == NULL) {
 		wl_client_post_no_memory(Client());
