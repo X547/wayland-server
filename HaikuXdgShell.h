@@ -7,7 +7,6 @@ struct HaikuXdgShell;
 
 class HaikuXdgShell: public WlGlocal {
 private:
-	struct wl_global *global;
 	struct wl_list clients;
 
 public:
@@ -23,7 +22,6 @@ public:
 	struct wl_list link; // wlr_xdg_shell.clients
 
 public:
-	static struct wl_global *CreateGlobal(struct wl_display *display);
 	virtual ~HaikuXdgWmBase();
 	static HaikuXdgWmBase *FromResource(struct wl_resource *resource) {return (HaikuXdgWmBase*)WlResource::FromResource(resource);}
 

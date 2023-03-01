@@ -27,22 +27,10 @@ static void Assert(bool cond) {if (!cond) abort();}
 extern "C" void
 wl_client_dispatch(struct wl_client *client, struct wl_closure *closure);
 
-extern "C" int
-wl_display_enqueue(struct wl_display *display, struct wl_closure *closure);
-
 typedef int (*client_enqueue_proc)(void *client_display, struct wl_closure *closure);
 
 
-void *gClientDisplay;
 static struct wl_display *sDisplay;
-
-struct HaikuSurface;
-
-HaikuSurface *haiku_surface_from_resource(struct wl_resource *resource);
-
-HaikuSurface *haiku_surface_create(struct wl_client *client, uint32_t version, uint32_t id);
-HaikuXdgSurface *haiku_xdg_surface_create(struct HaikuXdgWmBase *client, struct HaikuSurface *surface, uint32_t id);
-
 
 ServerHandler gServerHandler;
 BMessenger gServerMessenger;
@@ -150,7 +138,6 @@ extern "C" _EXPORT int wl_ips_client_connected(void **clientOut, void *clientDis
 	fprintf(stderr, "client: %p\n", client);
 	static_cast<Application*>(be_app)->AddClient(client);
 
-	gClientDisplay = clientDisplay;
 	*clientOut = client;
 
 	return 0;
