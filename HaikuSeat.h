@@ -52,6 +52,9 @@ public:
 		trackMove,
 		trackResize,
 	};
+	union TrackInfo {
+		XdgToplevel::ResizeEdge resizeEdge;
+	};
 private:
 	friend class HaikuSeat;
 	friend class HaikuPointer;
@@ -59,9 +62,11 @@ private:
 
 	struct Track {
 		TrackId id = trackNone;
+		bool captured;
+		bool inside;
 		BPoint origin;
 		int32_t wndWidth, wndHeight;
-		XdgToplevel::ResizeEdge resizeEdge;
+		TrackInfo info;
 	};
 
 	uint32_t fSerial = 1;
@@ -79,9 +84,10 @@ public:
 	virtual ~HaikuSeatGlobal() = default;
 	void Bind(struct wl_client *wl_client, uint32_t version, uint32_t id) override;
 
-	void SetPointerFocus(HaikuSurface *surface, bool setFocus, const BPoint &where);
+	void SetPointerFocus(HaikuSurface *surface, const BMessage &msg, TrackId trackId);
+	void SetPointerFocus(HaikuSurface *surface, bool setFocus, const BMessage &msg, TrackId trackId = trackClient);
 	void SetKeyboardFocus(HaikuSurface *surface, bool setFocus);
-	void DoTrack(TrackId id, XdgToplevel::ResizeEdge resizeEdge = XdgToplevel::resizeEdgeNone);
+	void DoTrack(TrackId id, const TrackInfo &info = {});
 	bool MessageReceived(HaikuSurface *surface, BMessage *msg);
 	void UpdateKeymap();
 };

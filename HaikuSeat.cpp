@@ -239,31 +239,53 @@ uint32_t HaikuSeatGlobal::NextSerial()
 	return (uint32_t)atomic_add((int32*)&fSerial, 1);
 }
 
-void HaikuSeatGlobal::SetPointerFocus(HaikuSurface *surface, bool setFocus, const BPoint &where)
+void HaikuSeatGlobal::SetPointerFocus(HaikuSurface *surface, const BMessage &msg, TrackId trackId)
 {
-	if (setFocus) {
-		if (fPointerFocus != surface) {
-			if (fPointerFocus != NULL) {
-				for (HaikuPointer *pointer = fPointerIfaces.First(); pointer != NULL; pointer = fPointerIfaces.GetNext(pointer)) {
-					if (pointer->Client() != fPointerFocus->Client()) continue;
-					pointer->SendLeave(NextSerial(), fPointerFocus->ToResource());
-					pointer->SendFrame();
-				}
+	if (surface == NULL) trackId = trackNone;
+	if (fPointerFocus == surface && fTrack.id == trackId) {
+		return;
+	}
+	if (fPointerFocus != NULL) {
+		switch (fTrack.id) {
+		case trackClient:
+			for (HaikuPointer *pointer = fPointerIfaces.First(); pointer != NULL; pointer = fPointerIfaces.GetNext(pointer)) {
+				if (pointer->Client() != fPointerFocus->Client()) continue;
+				pointer->SendLeave(NextSerial(), fPointerFocus->ToResource());
+				pointer->SendFrame();
 			}
-			fPointerFocus = surface;
+			break;
+		}
+	}
+	if (surface == NULL) {
+		fTrack.captured = false;
+		fTrack.inside = false;
+	}
+	if (fPointerFocus != surface) {
+		if (surface == NULL || msg.FindInt32("buttons", (int32*)&fOldMouseBtns) < B_OK) fOldMouseBtns = 0;
+	}
+	fPointerFocus = surface;
+	fTrack.id = trackId;
+	if (fPointerFocus != NULL) {
+		BPoint where;
+		if (msg.FindPoint("be:view_where", &where) < B_OK) where = B_ORIGIN;
+		switch (fTrack.id) {
+		case trackClient:
 			for (HaikuPointer *pointer = fPointerIfaces.First(); pointer != NULL; pointer = fPointerIfaces.GetNext(pointer)) {
 				if (pointer->Client() != surface->Client()) continue;
 				pointer->SendEnter(NextSerial(), surface->ToResource(), wl_fixed_from_double(where.x), wl_fixed_from_double(where.y));
 				pointer->SendFrame();
 			}
+			break;
 		}
+	}
+}
+
+void HaikuSeatGlobal::SetPointerFocus(HaikuSurface *surface, bool setFocus, const BMessage &msg, TrackId trackId)
+{
+	if (setFocus) {
+		SetPointerFocus(surface, msg, trackId);
 	} else if (fPointerFocus == surface) {
-		for (HaikuPointer *pointer = fPointerIfaces.First(); pointer != NULL; pointer = fPointerIfaces.GetNext(pointer)) {
-			if (pointer->Client() != fPointerFocus->Client()) continue;
-			pointer->SendLeave(NextSerial(), fPointerFocus->ToResource());
-			pointer->SendFrame();
-		}
-		fPointerFocus = NULL;
+		SetPointerFocus(NULL, msg, trackId);
 	}
 }
 
@@ -293,39 +315,52 @@ void HaikuSeatGlobal::SetKeyboardFocus(HaikuSurface *surface, bool setFocus)
 	}
 }
 
-void HaikuSeatGlobal::DoTrack(TrackId id, XdgToplevel::ResizeEdge resizeEdge)
+void HaikuSeatGlobal::DoTrack(TrackId id, const TrackInfo &info)
 {
-	if (fTrack.id != trackClient || fOldMouseBtns == 0) return;
-	fTrack.id = id;
-	fTrack.resizeEdge = resizeEdge;
-	if (id == trackResize) {
-		auto geometry = fPointerFocus->XdgSurface()->Geometry();
-		fTrack.wndWidth = geometry.width;
-		fTrack.wndHeight = geometry.height;
+	if (fTrack.id != trackClient || fOldMouseBtns == 0 || fPointerFocus == NULL) return;
+	SetPointerFocus(fPointerFocus, BMessage(), id);
+	fTrack.info = info;
+	switch (id) {
+		case trackResize: {
+			auto geometry = fPointerFocus->XdgSurface()->Geometry();
+			fTrack.wndWidth = geometry.width;
+			fTrack.wndHeight = geometry.height;
+			break;
+		}
 	}
 }
 
 bool HaikuSeatGlobal::MessageReceived(HaikuSurface *surface, BMessage *msg)
 {
-	// TODO: properly set pointer focus when new window created
-	// TODO: fix global stopping of pointer input after GTK combo box selection
-	// TODO: fix mouse whell scrolling in GTK 3
-
-	if (fTrack.id == trackNone && msg->what == B_MOUSE_MOVED) {
+	if (msg->what == B_MOUSE_MOVED) {
 		int32 transit;
 		msg->FindInt32("be:transit", &transit);
 
-		switch (transit) {
-			case B_ENTERED_VIEW:
-			case B_INSIDE_VIEW: {
-				BPoint where;
-				msg->FindPoint("be:view_where", &where);
-				SetPointerFocus(surface, true, where);
-				break;
+		if (!fTrack.captured) {
+			switch (transit) {
+				case B_ENTERED_VIEW:
+				case B_INSIDE_VIEW: {
+					BPoint where;
+					msg->FindPoint("be:view_where", &where);
+					SetPointerFocus(surface, true, *msg);
+					break;
+				}
+				case B_EXITED_VIEW:
+					SetPointerFocus(surface, false, BMessage());
+					break;
 			}
-			case B_EXITED_VIEW:
-				SetPointerFocus(surface, false, B_ORIGIN);
-				break;
+		}
+		if (fPointerFocus == surface) {
+			switch (transit) {
+				case B_ENTERED_VIEW:
+				case B_INSIDE_VIEW:
+					fTrack.inside = true;
+					break;
+				case B_EXITED_VIEW:
+				case B_OUTSIDE_VIEW:
+					fTrack.inside = false;
+					break;
+			}
 		}
 	}
 
@@ -395,7 +430,7 @@ bool HaikuSeatGlobal::MessageReceived(HaikuSurface *surface, BMessage *msg)
 			msg->FindInt32("buttons", (int32*)&btns);
 			uint32 oldBtns = fOldMouseBtns;
 			if (oldBtns == 0 && btns != 0) {
-				fTrack.id = trackClient;
+				fTrack.captured = true;
 				fTrack.origin = where;
 				AppKitPtrs::LockedPtr(surface->View())->SetMouseEventMask(B_POINTER_EVENTS);
 			}
@@ -428,10 +463,6 @@ bool HaikuSeatGlobal::MessageReceived(HaikuSurface *surface, BMessage *msg)
 			msg->FindInt64("when", &when);
 			msg->FindInt32("buttons", (int32*)&btns);
 			uint32 oldBtns = fOldMouseBtns;
-			if (oldBtns != 0 && btns == 0) {
-				fTrack.id = trackNone;
-			}
-			fOldMouseBtns = btns;
 			switch (fTrack.id) {
 				case trackNone:
 				case trackClient: {
@@ -451,6 +482,13 @@ bool HaikuSeatGlobal::MessageReceived(HaikuSurface *surface, BMessage *msg)
 					break;
 				}
 			}
+			if (oldBtns != 0 && btns == 0) {
+				fTrack.captured = false;
+			}
+			if (!fTrack.captured) {
+				SetPointerFocus(surface, fTrack.inside, *msg);
+			}
+			fOldMouseBtns = btns;
 			return true;
 		}
 		case B_MOUSE_MOVED: {
@@ -475,7 +513,7 @@ bool HaikuSeatGlobal::MessageReceived(HaikuSurface *surface, BMessage *msg)
 					break;
 				}
 				case trackResize: {
-					switch (fTrack.resizeEdge) {
+					switch (fTrack.info.resizeEdge) {
 						case XdgToplevel::resizeEdgeTopLeft: {
 							HaikuXdgSurface *xdgSurface = fPointerFocus->XdgSurface();
 							HaikuXdgSurface::GeometryInfo oldGeometry = xdgSurface->Geometry();

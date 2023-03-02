@@ -116,7 +116,7 @@ public:
 	virtual ~WaylandView() = default;
 
 	HaikuSurface *Surface() {return fSurface;}
-	
+
 	void WindowActivated(bool active) final;
 	void MessageReceived(BMessage *msg) final;
 	void Draw(BRect dirty);
@@ -144,7 +144,7 @@ void WaylandView::MessageReceived(BMessage *msg)
 	{
 		WaylandEnv wlEnv(this);
 		HaikuSeatGlobal *seat = HaikuGetSeat(fSurface->Client());
-	
+
 		if (seat != NULL && seat->MessageReceived(fSurface, msg)) {
 			return;
 		}
@@ -155,14 +155,26 @@ void WaylandView::MessageReceived(BMessage *msg)
 void WaylandView::Draw(BRect dirty)
 {
 	WaylandEnv wlEnv(this);
+
 	BBitmap *bmp = fSurface->Bitmap();
 	if (bmp != NULL) {
 		AppKitPtrs::LockedPtr(this)->DrawBitmap(bmp);
 	}
+
+	fSurface->CallFrameCallbacks();
 }
 
 
 //#pragma mark - HaikuSurface
+
+HaikuSurface::FrameCallback *HaikuSurface::FrameCallback::Create(struct wl_client *client, uint32_t version, uint32_t id)
+{
+	FrameCallback *callback = new(std::nothrow) FrameCallback();
+	if (!callback->Init(client, version, id)) {
+		return NULL;
+	}
+	return callback;
+}
 
 HaikuSurface *HaikuSurface::Create(struct wl_client *client, uint32_t version, uint32_t id)
 {
@@ -176,6 +188,7 @@ HaikuSurface *HaikuSurface::Create(struct wl_client *client, uint32_t version, u
 HaikuSurface::~HaikuSurface()
 {
 	fHook.Unset();
+	CallFrameCallbacks();
 /*
 	if (fView != NULL) {
 		fView->RemoveSelf();
@@ -185,7 +198,7 @@ HaikuSurface::~HaikuSurface()
 */
 	HaikuSeatGlobal *seat = HaikuGetSeat(Client());
 	if (seat != NULL) {
-		seat->SetPointerFocus(this, false, B_ORIGIN);
+		seat->SetPointerFocus(this, false, BMessage());
 		seat->SetKeyboardFocus(this, false);
 	}
 }
@@ -218,6 +231,15 @@ void HaikuSurface::Invalidate()
 	fDirty.MakeEmpty();
 }
 
+void HaikuSurface::CallFrameCallbacks()
+{
+	while (!fFrameCallbacks.IsEmpty()) {
+		FrameCallback *callback = fFrameCallbacks.RemoveHead();
+		callback->SendDone(system_time()/1000);
+		callback->Destroy();
+	}
+}
+
 void HaikuSurface::SetHook(Hook *hook)
 {
 	if (hook != NULL) {hook->fBase = this;}
@@ -241,11 +263,7 @@ void HaikuSurface::HandleDamage(int32_t x, int32_t y, int32_t width, int32_t hei
 
 void HaikuSurface::HandleFrame(uint32_t callback_id)
 {
-	fCallback = wl_resource_create(Client(), &wl_callback_interface, 1, callback_id);
-	if (fCallback == NULL) {
-		wl_client_post_no_memory(Client());
-		return;
-	}
+	fFrameCallbacks.Insert(FrameCallback::Create(Client(), 1, callback_id));
 }
 
 void HaikuSurface::HandleSetOpaqueRegion(struct wl_resource *region_resource)
@@ -303,12 +321,6 @@ void HaikuSurface::HandleCommit()
 	}
 	if (fHook.IsSet()) {
 		fHook->HandleCommit();
-	}
-
-	if (fCallback != NULL) {
-		wl_callback_send_done(fCallback, system_time()/1000);
-		wl_resource_destroy(fCallback);
-		fCallback = NULL;
 	}
 }
 

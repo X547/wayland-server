@@ -64,6 +64,17 @@ private:
 		BRegion inputRgn;
 	};
 
+	class FrameCallback: public WlCallback {
+	private:
+		DoublyLinkedListLink<FrameCallback> fLink;
+
+	public:
+		typedef DoublyLinkedList<FrameCallback, DoublyLinkedListMemberGetLink<FrameCallback, &FrameCallback::fLink>> List;
+
+		static FrameCallback *Create(struct wl_client *client, uint32_t version, uint32_t id);
+		virtual ~FrameCallback() = default;
+	};
+
 	ObjectDeleter<Hook> fHook;
 
 	State fState;
@@ -78,9 +89,8 @@ private:
 	HaikuSubsurface *fSubsurface{};
 
 	HaikuSubsurface::SurfaceList fSurfaceList;
-	uint8_t fVal[64]; // [!] crash without this on window close after fSurfaceList field is added
 
-	struct wl_resource *fCallback{};
+	FrameCallback::List fFrameCallbacks;
 
 public:
 	static HaikuSurface *Create(struct wl_client *client, uint32_t version, uint32_t id);
@@ -97,6 +107,7 @@ public:
 	void AttachView(BView *view);
 	void Detach();
 	void Invalidate();
+	void CallFrameCallbacks();
 
 	void SetHook(Hook *hook);
 
