@@ -3,7 +3,7 @@
 
 class WlResource {
 private:
-	struct wl_resource *fResource;
+	struct wl_resource *fResource = NULL;
 
 	static void Destructor(struct wl_resource *resource);
 	static int Dispatcher(const void *impl, void *resource, uint32_t opcode, const struct wl_message *message, union wl_argument *args);
