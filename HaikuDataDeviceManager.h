@@ -19,6 +19,9 @@ private:
 	HaikuDataDevice *fDataDevice{};
 	std::set<std::string> fMimeTypes;
 
+	static void ConvertToHaikuMessage(BMessage &dstMsg, const BMessage &srcMsg);
+
+
 public:
 	static HaikuDataSource *FromResource(struct wl_resource *resource) {return (HaikuDataSource*)WlResource::FromResource(resource);}
 	virtual ~HaikuDataSource();

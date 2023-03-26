@@ -6,6 +6,7 @@
 #include <Clipboard.h>
 #include <AutoLocker.h>
 #include <AutoDeleter.h>
+#include <String.h>
 
 #include <string.h>
 
@@ -19,6 +20,48 @@ enum {
 
 //#pragma mark - HaikuDataSource
 
+void HaikuDataSource::ConvertToHaikuMessage(BMessage &dstMsg, const BMessage &srcMsg)
+{
+	char *name;
+	type_code type;
+	int32 count;
+	const void *val;
+	ssize_t size;
+	for (int32 i = 0; srcMsg.GetInfo(B_MIME_TYPE, i, &name, &type, &count) == B_OK; i++) {
+		srcMsg.FindData(name, B_MIME_TYPE, 0, &val, &size);
+		if (strcmp(name, "text/plain;charset=utf-8") == 0) {
+			dstMsg.AddData("text/plain", B_MIME_TYPE, val, size);
+		} else if (strcmp(name, "text/plain") == 0) {
+			// drop
+		} else if (strcmp(name, "text/uri-list") == 0) {
+			BString str((const char*)val, size);
+			int32 pos = 0;
+			while (pos < str.Length()) {
+				int32 nextPos = str.FindFirst("\r\n", pos);
+				if (nextPos < 0) {
+					nextPos = str.Length();
+				}
+				if (str[pos] != '#') {
+					if (str.FindFirst("file://", pos) == pos) {
+						BString path;
+						str.CopyInto(path, pos + strlen("file://"), nextPos - pos - strlen("file://"));
+						printf("path: \"%s\"\n", path.String());
+						BEntry entry(path);
+						if (entry.InitCheck() >= B_OK) {
+							entry_ref ref;
+							entry.GetRef(&ref);
+							dstMsg.AddRef("refs", &ref);
+						}
+					}
+				}
+				pos = nextPos + strlen("\r\n");
+			}
+
+		} else {
+			dstMsg.AddData(name, B_MIME_TYPE, val, size);
+		}
+	}
+}
 HaikuDataSource::~HaikuDataSource()
 {
 	if (fDataDevice != NULL && fDataDevice->fDataSource == this)
@@ -61,7 +104,9 @@ BMessage *HaikuDataSource::ToMessage()
 		ReadData(data, mimeType.c_str());
 		msg->AddData(mimeType.c_str(), B_MIME_TYPE, &data[0], data.size());
 	}
-	return msg.Detach();
+	ObjectDeleter<BMessage> dstMsg(new BMessage(B_SIMPLE_DATA));
+	ConvertToHaikuMessage(*dstMsg.Get(), *msg.Get());
+	return dstMsg.Detach();
 }
 
 void HaikuDataSource::HandleOffer(const char *mimeType)
