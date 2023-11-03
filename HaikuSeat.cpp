@@ -12,6 +12,7 @@
 #include <Autolock.h>
 #include "AppKitPtrs.h"
 
+#include <stdio.h>
 #include <algorithm>
 
 extern const struct wl_interface wl_seat_interface;
