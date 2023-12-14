@@ -11,6 +11,7 @@
 class BMessage;
 class HaikuSurface;
 class HaikuSeatGlobal;
+class HaikuDataDevice;
 
 class HaikuPointer: public WlPointer {
 private:
@@ -51,6 +52,7 @@ public:
 		trackClient,
 		trackMove,
 		trackResize,
+		trackDrag,
 	};
 	union TrackInfo {
 		XdgToplevel::ResizeEdge resizeEdge;
@@ -59,6 +61,7 @@ private:
 	friend class HaikuSeat;
 	friend class HaikuPointer;
 	friend class HaikuKeyboard;
+	friend class HaikuDataDevice;
 
 	struct Track {
 		TrackId id = trackNone;
@@ -72,6 +75,7 @@ private:
 	uint32_t fSerial = 1;
 	HaikuPointer::List fPointerIfaces{};
 	HaikuKeyboard::List fKeyboardIfaces{};
+	HaikuDataDevice *fDataDevice{};
 	HaikuSurface *fPointerFocus{};
 	HaikuSurface *fKeyboardFocus{};
 	uint32 fOldMouseBtns{};
