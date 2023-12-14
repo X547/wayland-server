@@ -1,6 +1,6 @@
 #include "HaikuDataDeviceManager.h"
 #include "HaikuSeat.h"
-#include "WaylandServer.h"
+#include "WaylandServerIps.h"
 #include "AppKitPtrs.h"
 #include <Screen.h>
 #include <Clipboard.h>
@@ -224,6 +224,7 @@ HaikuDataDevice *HaikuDataDevice::Create(struct wl_client *client, uint32_t vers
 		return NULL;
 	}
 	dataDevice->fSeat = HaikuSeat::FromResource(seat);
+	dataDevice->fSeat->GetGlobal()->fDataDevice = dataDevice;
 
 	AppKitPtrs::LockedPtr(&gServerHandler)->Looper()->AddHandler(&dataDevice->fClipboardWatcher);
 	be_clipboard->StartWatching(BMessenger(&dataDevice->fClipboardWatcher));

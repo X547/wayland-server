@@ -2,6 +2,7 @@
 #include "HaikuCompositor.h"
 #include "HaikuXdgSurface.h"
 #include "HaikuXdgToplevel.h"
+#include "HaikuDataDeviceManager.h"
 #include "WaylandKeycodes.h"
 #include "XkbKeymap.h"
 #include <SupportDefs.h>
@@ -255,6 +256,9 @@ void HaikuSeatGlobal::SetPointerFocus(HaikuSurface *surface, const BMessage &msg
 				pointer->SendFrame();
 			}
 			break;
+		case trackDrag:
+			fDataDevice->SendLeave();
+			break;
 		}
 	}
 	if (surface == NULL) {
@@ -268,7 +272,10 @@ void HaikuSeatGlobal::SetPointerFocus(HaikuSurface *surface, const BMessage &msg
 	fTrack.id = trackId;
 	if (fPointerFocus != NULL) {
 		BPoint where;
-		if (msg.FindPoint("be:view_where", &where) < B_OK) where = B_ORIGIN;
+		if (msg.WasDropped()) {
+			where = msg.DropPoint();
+			AppKitPtrs::LockedPtr(fPointerFocus->View())->ConvertFromScreen(&where);
+		} else if (msg.FindPoint("be:view_where", &where) < B_OK) where = B_ORIGIN;
 		switch (fTrack.id) {
 		case trackClient:
 			for (HaikuPointer *pointer = fPointerIfaces.First(); pointer != NULL; pointer = fPointerIfaces.GetNext(pointer)) {
@@ -277,6 +284,13 @@ void HaikuSeatGlobal::SetPointerFocus(HaikuSurface *surface, const BMessage &msg
 				pointer->SendFrame();
 			}
 			break;
+			case trackDrag: {
+				BMessage data;
+				msg.FindMessage("be:drag_message", &data);
+				HaikuDataOffer *dataOffer = HaikuDataOffer::Create(fDataDevice, data);
+				fDataDevice->SendEnter(NextSerial(), fPointerFocus->ToResource(), wl_fixed_from_double(where.x), wl_fixed_from_double(where.y), dataOffer->ToResource());
+				break;
+			}
 		}
 	}
 }
@@ -333,6 +347,16 @@ void HaikuSeatGlobal::DoTrack(TrackId id, const TrackInfo &info)
 
 bool HaikuSeatGlobal::MessageReceived(HaikuSurface *surface, BMessage *msg)
 {
+	if (msg->WasDropped()) {
+		fprintf(stderr, "WasDropped, (fPointerFocus == surface: %d, fTrack.id == trackDrag: %d)\n", fPointerFocus == surface, fTrack.id == trackDrag);
+		if (fPointerFocus == surface && fTrack.id == trackDrag) {
+			fDataDevice->SendDrop();
+			fTrack.captured = false;
+			SetPointerFocus(surface, true, *msg, trackClient);
+		}
+		return true;
+	}
+
 	if (msg->what == B_MOUSE_MOVED) {
 		int32 transit;
 		msg->FindInt32("be:transit", &transit);
@@ -343,7 +367,9 @@ bool HaikuSeatGlobal::MessageReceived(HaikuSurface *surface, BMessage *msg)
 				case B_INSIDE_VIEW: {
 					BPoint where;
 					msg->FindPoint("be:view_where", &where);
-					SetPointerFocus(surface, true, *msg);
+					bool isDrag = msg->HasMessage("be:drag_message");
+					SetPointerFocus(surface, true, *msg, isDrag ? trackDrag : trackClient);
+					fTrack.captured = isDrag;
 					break;
 				}
 				case B_EXITED_VIEW:
@@ -360,6 +386,10 @@ bool HaikuSeatGlobal::MessageReceived(HaikuSurface *surface, BMessage *msg)
 				case B_EXITED_VIEW:
 				case B_OUTSIDE_VIEW:
 					fTrack.inside = false;
+					if (fTrack.id == trackDrag) {
+						fTrack.captured = false;
+						SetPointerFocus(surface, false, BMessage());
+					}
 					break;
 			}
 		}
@@ -483,7 +513,7 @@ bool HaikuSeatGlobal::MessageReceived(HaikuSurface *surface, BMessage *msg)
 					break;
 				}
 			}
-			if (oldBtns != 0 && btns == 0) {
+			if (oldBtns != 0 && btns == 0 && fTrack.id != trackDrag) {
 				fTrack.captured = false;
 			}
 			if (!fTrack.captured) {
@@ -507,6 +537,10 @@ bool HaikuSeatGlobal::MessageReceived(HaikuSurface *surface, BMessage *msg)
 						pointer->SendMotion(when / 1000, wl_fixed_from_double(where.x), wl_fixed_from_double(where.y));
 						pointer->SendFrame();
 					}
+					break;
+				}
+				case trackDrag: {
+					fDataDevice->SendMotion(when / 1000, wl_fixed_from_double(where.x), wl_fixed_from_double(where.y));
 					break;
 				}
 				case trackMove: {
