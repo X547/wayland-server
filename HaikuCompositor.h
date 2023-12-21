@@ -3,6 +3,7 @@
 #include "Wayland.h"
 #include "WlGlobal.h"
 #include "HaikuSubcompositor.h"
+#include "HaikuShm.h"
 #include <AutoDeleter.h>
 #include <Point.h>
 #include <Region.h>
@@ -41,13 +42,6 @@ private:
 	friend class HaikuServerDecoration;
 	friend class HaikuSubsurface;
 
-	struct Buffer {
-		int32_t stride{};
-		void *data{};
-		uint32_t format{};
-		int32_t width{}, height{};
-	};
-
 	struct State {
 		union {
 			struct {
@@ -56,7 +50,7 @@ private:
 			};
 			uint32 val;
 		} valid{};
-		struct wl_resource *buffer;
+		HaikuShmBuffer *buffer;
 		int32_t dx = 0, dy = 0;
 		int32_t transform = WlOutput::transformNormal;
 		int32_t scale = 1;
@@ -79,10 +73,7 @@ private:
 
 	State fState;
 	State fPendingState;
-	Buffer fBuffer;
-	bool fBufferAttached = false;
 	BRegion fDirty;
-	ObjectDeleter<BBitmap> fBitmap;
 	WaylandView *fView;
 	HaikuXdgSurface *fXdgSurface{};
 	HaikuServerDecoration *fServerDecoration{};
@@ -98,7 +89,8 @@ public:
 	virtual ~HaikuSurface();
 
 	BView *View() {return (BView*)fView;}
-	BBitmap *Bitmap() {return fBitmap.Get();}
+	BBitmap *Bitmap() {return fState.buffer == NULL ? NULL : &fState.buffer->Bitmap();}
+	void GetOffset(int32_t &x, int32_t &y) {x = fState.dx; y = fState.dy;}
 	HaikuXdgSurface *XdgSurface() {return fXdgSurface;}
 	HaikuSubsurface *Subsurface() {return fSubsurface;}
 	HaikuServerDecoration *ServerDecoration() {return fServerDecoration;}
