@@ -1,6 +1,6 @@
 #include "HaikuDataDeviceManager.h"
 #include "HaikuSeat.h"
-#include "WaylandServerIps.h"
+#include "WaylandServer.h"
 #include "AppKitPtrs.h"
 #include <Screen.h>
 #include <Clipboard.h>
