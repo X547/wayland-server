@@ -146,12 +146,7 @@ void WaylandView::MessageReceived(BMessage *msg)
 		WaylandEnv wlEnv(this);
 		HaikuSeatGlobal *seat = HaikuGetSeat(fSurface->Client());
 
-		HaikuSurface *surface = fSurface;
-		while (surface->Subsurface() != NULL) {
-			surface = surface->Subsurface()->Parent();
-		}
-
-		if (seat != NULL && seat->MessageReceived(surface, msg)) {
+		if (seat != NULL && seat->MessageReceived(fSurface, msg)) {
 			return;
 		}
 	}
@@ -201,8 +196,8 @@ HaikuSurface::~HaikuSurface()
 	if (fPendingState.buffer != NULL && fPendingState.buffer != fState.buffer) {
 		fPendingState.buffer->SendRelease();
 	}
-	fState.buffer = 0;
-	fPendingState.buffer = 0;
+	fState.buffer = NULL;
+	fPendingState.buffer = NULL;
 /*
 	if (fView != NULL) {
 		fView->RemoveSelf();
