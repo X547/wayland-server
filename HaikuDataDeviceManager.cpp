@@ -1,7 +1,10 @@
 #include "HaikuDataDeviceManager.h"
 #include "HaikuSeat.h"
-#include "WaylandServerIps.h"
+#include "HaikuCompositor.h"
+#include "WaylandServer.h"
 #include "AppKitPtrs.h"
+#include <View.h>
+#include <Bitmap.h>
 #include <Screen.h>
 #include <Clipboard.h>
 #include <AutoLocker.h>
@@ -18,95 +21,127 @@ enum {
 };
 
 
-//#pragma mark - HaikuDataSource
+//#pragma mark - SurfaceDragHook
 
-void HaikuDataSource::ConvertToHaikuMessage(BMessage &dstMsg, const BMessage &srcMsg)
+class SurfaceDragHook: public HaikuSurface::Hook {
+private:
+	HaikuSurface *fOrigin;
+	HaikuDataSource *fDataSource;
+
+public:
+	SurfaceDragHook(HaikuSurface *origin, HaikuDataSource *dataSource);
+	void HandleCommit() final;
+};
+
+SurfaceDragHook::SurfaceDragHook(HaikuSurface *origin, HaikuDataSource *dataSource):
+	fOrigin(origin), fDataSource(dataSource)
 {
-	char *name;
-	type_code type;
-	int32 count;
-	const void *val;
-	ssize_t size;
-	for (int32 i = 0; srcMsg.GetInfo(B_MIME_TYPE, i, &name, &type, &count) == B_OK; i++) {
-		srcMsg.FindData(name, B_MIME_TYPE, 0, &val, &size);
-		if (strcmp(name, "text/plain;charset=utf-8") == 0) {
-			dstMsg.AddData("text/plain", B_MIME_TYPE, val, size);
-		} else if (strcmp(name, "text/plain") == 0) {
-			// drop
-		} else if (strcmp(name, "text/uri-list") == 0) {
-			BString str((const char*)val, size);
-			int32 pos = 0;
-			while (pos < str.Length()) {
-				int32 nextPos = str.FindFirst("\r\n", pos);
-				if (nextPos < 0) {
-					nextPos = str.Length();
-				}
-				if (str[pos] != '#') {
-					if (str.FindFirst("file://", pos) == pos) {
-						BString path;
-						str.CopyInto(path, pos + strlen("file://"), nextPos - pos - strlen("file://"));
-						printf("path: \"%s\"\n", path.String());
-						BEntry entry(path);
-						if (entry.InitCheck() >= B_OK) {
-							entry_ref ref;
-							entry.GetRef(&ref);
-							dstMsg.AddRef("refs", &ref);
-						}
-					}
-				}
-				pos = nextPos + strlen("\r\n");
-			}
+}
 
-		} else {
-			dstMsg.AddData(name, B_MIME_TYPE, val, size);
-		}
+void SurfaceDragHook::HandleCommit()
+{
+	BBitmap *bitmap = Base()->Bitmap();
+	if (bitmap != NULL) {
+		int32_t x, y;
+		Base()->GetOffset(x, y);
+		ObjectDeleter<BMessage> msg(fDataSource->ToMessage());
+		AppKitPtrs::LockedPtr viewLocked(fOrigin->View());
+		viewLocked->DragMessage(msg.Get(), new BBitmap(bitmap), BPoint(-x, -y), fDataSource->GetHandler());
 	}
 }
+
+
+//#pragma mark - HaikuDataSource
+
+void HaikuDataSource::Handler::MessageReceived(BMessage *msg)
+{
+	printf("HaikuDataSource::Handler::MessageReceived()\n");
+	msg->PrintToStream();
+	switch (msg->what) {
+		case B_MOVE_TARGET:
+		case B_COPY_TARGET:
+		case B_TRASH_TARGET: {
+			switch (msg->what) {
+				case B_MOVE_TARGET:
+				case B_TRASH_TARGET:
+					fBase->SendAction(WlDataDeviceManager::dndActionMove);
+					break;
+				case B_COPY_TARGET:
+					fBase->SendAction(WlDataDeviceManager::dndActionCopy);
+					break;
+			}
+			fBase->SendDndDropPerformed();
+
+			if (msg->what != B_TRASH_TARGET) {
+				const char *typeName = NULL;
+				if (msg->FindString("be:types", &typeName) >= B_OK) {
+					fBase->SendTarget(typeName);
+
+					int pipes[2];
+					pipe(pipes);
+					FileDescriptorCloser readPipe(pipes[0]);
+					FileDescriptorCloser writePipe(pipes[1]);
+					fcntl(readPipe.Get(), F_SETFD, FD_CLOEXEC);
+					fcntl(writePipe.Get(), F_SETFD, FD_CLOEXEC);
+					fBase->SendSend(typeName, writePipe.Get());
+					writePipe.Unset();
+					std::vector<uint8> data;
+					enum {
+						bufferSize = 1024,
+					};
+					while (true) {
+						data.resize(data.size() + bufferSize);
+						size_t readLen = read(readPipe.Get(), &data[data.size() - bufferSize], bufferSize);
+						data.resize(data.size() + readLen - bufferSize);
+						if (readLen == 0) {
+							break;
+						}
+					}
+
+					BMessage reply(B_MIME_DATA);
+					reply.AddData(typeName, B_MIME_TYPE, &data[0], data.size());
+					msg->SendReply(&reply);
+				} else if (msg->FindString("wl:accepted_type", &typeName) >= B_OK) {
+					fBase->SendTarget(typeName);
+				}
+			}
+
+			fBase->SendDndFinished();
+			return;
+		}
+		case B_MESSAGE_NOT_UNDERSTOOD:
+			fBase->SendDndDropPerformed();
+			fBase->SendCancelled();
+			return;
+	}
+	BHandler::MessageReceived(msg);
+}
+
+
 HaikuDataSource::~HaikuDataSource()
 {
 	if (fDataDevice != NULL && fDataDevice->fDataSource == this)
 		fDataDevice->fDataSource = NULL;
 }
 
-status_t HaikuDataSource::ReadData(std::vector<uint8> &data, const char *mimeType)
-{
-	int pipes[2];
-	pipe(pipes);
-	FileDescriptorCloser readPipe(pipes[0]);
-	FileDescriptorCloser writePipe(pipes[1]);
-	fcntl(readPipe.Get(), F_SETFD, FD_CLOEXEC);
-	fcntl(writePipe.Get(), F_SETFD, FD_CLOEXEC);
-	SendSend(mimeType, writePipe.Get());
-	writePipe.Unset();
-	data.resize(0);
-	enum {
-		bufferSize = 1024,
-	};
-	while (true) {
-		data.resize(data.size() + bufferSize);
-		size_t readLen = read(readPipe.Get(), &data[data.size() - bufferSize], bufferSize);
-		data.resize(data.size() + readLen - bufferSize);
-		if (readLen == 0) {
-			break;
-		}
-	}
-	return B_OK;
-}
-
 BMessage *HaikuDataSource::ToMessage()
 {
 	ObjectDeleter<BMessage> msg(new BMessage(B_SIMPLE_DATA));
-	for (auto &mimeType: fMimeTypes) {
-		if (mimeType == "DELETE" || mimeType == "SAVE_TARGETS") {
-			continue;
-		}
-		std::vector<uint8> data;
-		ReadData(data, mimeType.c_str());
-		msg->AddData(mimeType.c_str(), B_MIME_TYPE, &data[0], data.size());
+	if ((fSupportedDndActions & WlDataDeviceManager::dndActionMove) != 0) {
+		msg->AddInt32("be:actions", B_MOVE_TARGET);
+		msg->AddInt32("be:actions", B_TRASH_TARGET);
 	}
-	ObjectDeleter<BMessage> dstMsg(new BMessage(B_SIMPLE_DATA));
-	ConvertToHaikuMessage(*dstMsg.Get(), *msg.Get());
-	return dstMsg.Detach();
+	if ((fSupportedDndActions & WlDataDeviceManager::dndActionCopy) != 0) {
+		msg->AddInt32("be:actions", B_COPY_TARGET);
+	}
+	for (auto &mimeType: fMimeTypes) {
+		msg->AddString("be:types", mimeType.c_str());
+	}
+	if (!fHandler.IsSet()) {
+		fHandler.SetTo(new Handler(this));
+		WaylandServer::GetLooper()->AddHandler(fHandler.Get());
+	}
+	return msg.Detach();
 }
 
 void HaikuDataSource::HandleOffer(const char *mimeType)
@@ -116,6 +151,7 @@ void HaikuDataSource::HandleOffer(const char *mimeType)
 
 void HaikuDataSource::HandleSetActions(uint32_t dndActions)
 {
+	fSupportedDndActions = dndActions;
 }
 
 
@@ -136,36 +172,43 @@ HaikuDataOffer *HaikuDataOffer::Create(HaikuDataDevice *dataDevice, const BMessa
 
 	dataDevice->SendDataOffer(dataOffer->ToResource());
 
-	char *name;
-	type_code type;
-	int32 count;
-	const void *val;
-	ssize_t size;
-	for (int32 i = 0; data.GetInfo(B_MIME_TYPE, i, &name, &type, &count) == B_OK; i++) {
-			data.FindData(name, B_MIME_TYPE, 0, &val, &size);
-			dataOffer->SendOffer(name);
-			if (strcmp(name, "text/plain") == 0 && !data.HasData("text/plain;charset=utf-8", B_MIME_TYPE)) {
-				dataOffer->SendOffer("text/plain;charset=utf-8");
-			}
+	const char *name;
+	for (int32 i = 0; data.FindString("be:types", i, &name) >= B_OK; i++) {
+		dataOffer->SendOffer(name);
 	}
 
-	dataOffer->SendAction(0);
+	dataOffer->SendAction(WlDataDeviceManager::dndActionCopy);
 	dataOffer->SendSourceActions(7);
 	return dataOffer;
 }
 
 void HaikuDataOffer::HandleAccept(uint32_t serial, const char *mime_type)
 {
+	fAcceptedType = mime_type == NULL ? "" : mime_type;
 }
 
 void HaikuDataOffer::HandleReceive(const char *mimeType, int32_t fd)
 {
-	if (strcmp(mimeType, "text/plain;charset=utf-8") == 0) {
-		mimeType = "text/plain";
+	uint32 action;
+	switch (fPreferredAction) {
+		case WlDataDeviceManager::dndActionMove:
+			action = B_MOVE_TARGET;
+			break;
+		case WlDataDeviceManager::dndActionCopy:
+		default:
+			action = B_COPY_TARGET;
+			break;
 	}
+
+	BMessage reply(action);
+	reply.AddString("be:types", mimeType);
+	BMessage data;
+	fReplySent = true;
+	fDropMessage->SendReply(&reply, &data);
+
 	const uint8 *val;
 	ssize_t size;
-	fData.FindData(mimeType, B_MIME_TYPE, 0, (const void**)&val, &size);
+	data.FindData(mimeType, B_MIME_TYPE, 0, (const void**)&val, &size);
 	while (size > 0) {
 		ssize_t sizeWritten = write(fd, val, size);
 		if (sizeWritten < 0) break;
@@ -177,10 +220,29 @@ void HaikuDataOffer::HandleReceive(const char *mimeType, int32_t fd)
 
 void HaikuDataOffer::HandleFinish()
 {
+	if (!fReplySent && fAcceptedType.size() > 0) {
+		uint32 action;
+		switch (fPreferredAction) {
+			case WlDataDeviceManager::dndActionMove:
+				action = B_MOVE_TARGET;
+				break;
+			case WlDataDeviceManager::dndActionCopy:
+			default:
+				action = B_COPY_TARGET;
+				break;
+		}
+
+		BMessage reply(action);
+		reply.AddString("wl:accepted_type", fAcceptedType.c_str());
+		fReplySent = true;
+		fDropMessage->SendReply(&reply);
+	}
 }
 
 void HaikuDataOffer::HandleSetActions(uint32_t dnd_actions, uint32_t preferred_action)
 {
+	fDndActions = dnd_actions;
+	fPreferredAction = preferred_action;
 }
 
 
@@ -223,10 +285,10 @@ HaikuDataDevice *HaikuDataDevice::Create(struct wl_client *client, uint32_t vers
 	if (!dataDevice->Init(client, version, id)) {
 		return NULL;
 	}
-	dataDevice->fSeat = HaikuSeat::FromResource(seat);
-	dataDevice->fSeat->GetGlobal()->fDataDevice = dataDevice;
+	dataDevice->fSeat = HaikuSeat::FromResource(seat)->GetGlobal();
+	dataDevice->fSeat->fDataDevices.Insert(dataDevice);
 
-	AppKitPtrs::LockedPtr(&gServerHandler)->Looper()->AddHandler(&dataDevice->fClipboardWatcher);
+	WaylandServer::GetLooper()->AddHandler(&dataDevice->fClipboardWatcher);
 	be_clipboard->StartWatching(BMessenger(&dataDevice->fClipboardWatcher));
 
 	return dataDevice;
@@ -234,12 +296,19 @@ HaikuDataDevice *HaikuDataDevice::Create(struct wl_client *client, uint32_t vers
 
 HaikuDataDevice::~HaikuDataDevice()
 {
+	fSeat->fDataDevices.Remove(this);
 	be_clipboard->StopWatching(BMessenger(&fClipboardWatcher));
-	AppKitPtrs::LockedPtr(&gServerHandler)->Looper()->RemoveHandler(&fClipboardWatcher);
+	WaylandServer::GetLooper()->RemoveHandler(&fClipboardWatcher);
 }
 
 void HaikuDataDevice::HandleStartDrag(struct wl_resource *_source, struct wl_resource *_origin, struct wl_resource *_icon, uint32_t serial)
 {
+	fprintf(stderr, "HaikuDataDevice::HandleStartDrag()\n");
+	HaikuDataSource *source = HaikuDataSource::FromResource(_source);
+	HaikuSurface *origin = HaikuSurface::FromResource(_origin);
+	HaikuSurface *icon = HaikuSurface::FromResource(_icon);
+	icon->SetHook(new SurfaceDragHook(origin, source));
+	fSeat->SetPointerFocus(NULL, BMessage(), HaikuSeatGlobal::trackNone);
 }
 
 void HaikuDataDevice::HandleSetSelection(struct wl_resource *_source, uint32_t serial)
@@ -247,7 +316,6 @@ void HaikuDataDevice::HandleSetSelection(struct wl_resource *_source, uint32_t s
 	if (_source == NULL) return;
 
 	HaikuDataSource *source = HaikuDataSource::FromResource(_source);
-
 
 	ObjectDeleter<BMessage> srcMsg(source->ToMessage());
 
@@ -305,12 +373,12 @@ void HaikuDataDeviceManager::HandleCreateDataSource(uint32_t id)
 		wl_client_post_no_memory(Client());
 		return;
 	}
-	if (!dataSource->Init(Client(), wl_resource_get_version(ToResource()), id)) {
+	if (!dataSource->Init(Client(), Version(), id)) {
 		return;
 	}
 }
 
 void HaikuDataDeviceManager::HandleGetDataDevice(uint32_t id, struct wl_resource *seat)
 {
-	HaikuDataDevice *dataDevice = HaikuDataDevice::Create(Client(), wl_resource_get_version(ToResource()), id, seat);
+	HaikuDataDevice *dataDevice = HaikuDataDevice::Create(Client(), Version(), id, seat);
 }

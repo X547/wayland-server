@@ -178,6 +178,7 @@ public:
 
 void SurfaceCursorHook::HandleCommit()
 {
+#if 1
 	BBitmap *bitmap = Base()->Bitmap();
 	if (bitmap != NULL) {
 		BCursor cursor(bitmap, fHotspot);
@@ -185,6 +186,7 @@ void SurfaceCursorHook::HandleCommit()
 	} else {
 		be_app->SetCursor(B_CURSOR_SYSTEM_DEFAULT, true);
 	}
+#endif
 }
 
 
@@ -253,11 +255,17 @@ void HaikuSeatGlobal::SetPointerFocus(HaikuSurface *surface, const BMessage &msg
 			for (HaikuPointer *pointer = fPointerIfaces.First(); pointer != NULL; pointer = fPointerIfaces.GetNext(pointer)) {
 				if (pointer->Client() != fPointerFocus->Client()) continue;
 				pointer->SendLeave(NextSerial(), fPointerFocus->ToResource());
-				pointer->SendFrame();
+				if (pointer->Version() >= 5) {
+					pointer->SendFrame();
+				}
 			}
 			break;
 		case trackDrag:
-			fDataDevice->SendLeave();
+			for (HaikuDataDevice *dataDevice = fDataDevices.First(); dataDevice != NULL; dataDevice = fDataDevices.GetNext(dataDevice)) {
+				if (dataDevice->Client() != fPointerFocus->Client()) continue;
+				dataDevice->SendLeave();
+			}
+			fTrack.dataOffer = NULL;
 			break;
 		}
 	}
@@ -281,14 +289,21 @@ void HaikuSeatGlobal::SetPointerFocus(HaikuSurface *surface, const BMessage &msg
 			for (HaikuPointer *pointer = fPointerIfaces.First(); pointer != NULL; pointer = fPointerIfaces.GetNext(pointer)) {
 				if (pointer->Client() != surface->Client()) continue;
 				pointer->SendEnter(NextSerial(), surface->ToResource(), wl_fixed_from_double(where.x), wl_fixed_from_double(where.y));
-				pointer->SendFrame();
+				if (pointer->Version() >= 5) {
+					pointer->SendFrame();
+				}
 			}
 			break;
 			case trackDrag: {
 				BMessage data;
 				msg.FindMessage("be:drag_message", &data);
-				HaikuDataOffer *dataOffer = HaikuDataOffer::Create(fDataDevice, data);
-				fDataDevice->SendEnter(NextSerial(), fPointerFocus->ToResource(), wl_fixed_from_double(where.x), wl_fixed_from_double(where.y), dataOffer->ToResource());
+				for (HaikuDataDevice *dataDevice = fDataDevices.First(); dataDevice != NULL; dataDevice = fDataDevices.GetNext(dataDevice)) {
+					if (dataDevice->Client() != fPointerFocus->Client()) continue;
+					if (fTrack.dataOffer == NULL) {
+						fTrack.dataOffer = HaikuDataOffer::Create(dataDevice, data);
+					}
+					dataDevice->SendEnter(NextSerial(), fPointerFocus->ToResource(), wl_fixed_from_double(where.x), wl_fixed_from_double(where.y), fTrack.dataOffer->ToResource());
+				}
 				break;
 			}
 		}
@@ -348,9 +363,12 @@ void HaikuSeatGlobal::DoTrack(TrackId id, const TrackInfo &info)
 bool HaikuSeatGlobal::MessageReceived(HaikuSurface *surface, BMessage *msg)
 {
 	if (msg->WasDropped()) {
-		fprintf(stderr, "WasDropped, (fPointerFocus == surface: %d, fTrack.id == trackDrag: %d)\n", fPointerFocus == surface, fTrack.id == trackDrag);
 		if (fPointerFocus == surface && fTrack.id == trackDrag) {
-			fDataDevice->SendDrop();
+			fTrack.dataOffer->DropMessageReceived(AppKitPtrs::LockedPtr(fPointerFocus->View())->Looper()->DetachCurrentMessage());
+			for (HaikuDataDevice *dataDevice = fDataDevices.First(); dataDevice != NULL; dataDevice = fDataDevices.GetNext(dataDevice)) {
+				if (dataDevice->Client() != fPointerFocus->Client()) continue;
+				dataDevice->SendDrop();
+			}
 			fTrack.captured = false;
 			SetPointerFocus(surface, true, *msg, trackClient);
 		}
@@ -447,7 +465,9 @@ bool HaikuSeatGlobal::MessageReceived(HaikuSurface *surface, BMessage *msg)
 			}
 			for (HaikuPointer *pointer = fPointerIfaces.First(); pointer != NULL; pointer = fPointerIfaces.GetNext(pointer)) {
 				if (pointer->Client() != fPointerFocus->Client()) continue;
-				pointer->SendFrame();
+				if (pointer->Version() >= 5) {
+					pointer->SendFrame();
+				}
 			}
 			return true;
 		}
@@ -480,7 +500,9 @@ bool HaikuSeatGlobal::MessageReceived(HaikuSurface *surface, BMessage *msg)
 					}
 					for (HaikuPointer *pointer = fPointerIfaces.First(); pointer != NULL; pointer = fPointerIfaces.GetNext(pointer)) {
 						if (pointer->Client() != fPointerFocus->Client()) continue;
-						pointer->SendFrame();
+						if (pointer->Version() >= 5) {
+							pointer->SendFrame();
+						}
 					}
 					break;
 				}
@@ -508,7 +530,9 @@ bool HaikuSeatGlobal::MessageReceived(HaikuSurface *surface, BMessage *msg)
 					}
 					for (HaikuPointer *pointer = fPointerIfaces.First(); pointer != NULL; pointer = fPointerIfaces.GetNext(pointer)) {
 						if (pointer->Client() != fPointerFocus->Client()) continue;
-						pointer->SendFrame();
+						if (pointer->Version() >= 5) {
+							pointer->SendFrame();
+						}
 					}
 					break;
 				}
@@ -535,12 +559,17 @@ bool HaikuSeatGlobal::MessageReceived(HaikuSurface *surface, BMessage *msg)
 					for (HaikuPointer *pointer = fPointerIfaces.First(); pointer != NULL; pointer = fPointerIfaces.GetNext(pointer)) {
 						if (pointer->Client() != fPointerFocus->Client()) continue;
 						pointer->SendMotion(when / 1000, wl_fixed_from_double(where.x), wl_fixed_from_double(where.y));
-						pointer->SendFrame();
+						if (pointer->Version() >= 5) {
+							pointer->SendFrame();
+						}
 					}
 					break;
 				}
 				case trackDrag: {
-					fDataDevice->SendMotion(when / 1000, wl_fixed_from_double(where.x), wl_fixed_from_double(where.y));
+					for (HaikuDataDevice *dataDevice = fDataDevices.First(); dataDevice != NULL; dataDevice = fDataDevices.GetNext(dataDevice)) {
+						if (dataDevice->Client() != fPointerFocus->Client()) continue;
+						dataDevice->SendMotion(when / 1000, wl_fixed_from_double(where.x), wl_fixed_from_double(where.y));
+					}
 					break;
 				}
 				case trackMove: {
@@ -592,10 +621,14 @@ bool HaikuSeatGlobal::MessageReceived(HaikuSurface *surface, BMessage *msg)
 void HaikuSeatGlobal::UpdateKeymap()
 {
 	int fd;
+#if 1
 	if (ProduceXkbKeymap(fd) < B_OK) {
 		fprintf(stderr, "[!] ProduceXkbKeymap failed\n");
 		return;
 	}
+#else
+	fd = open("/Haiku/data/packages/wayland/keymap", O_RDONLY);
+#endif
 	FileDescriptorCloser fdCloser(fd);
 	struct stat st{};
 	fstat(fd, &st);
@@ -612,7 +645,7 @@ void HaikuSeat::HandleGetPointer(uint32_t id)
 		wl_client_post_no_memory(Client());
 		return;
 	}
-	if (!pointer->Init(Client(), wl_resource_get_version(ToResource()), id)) {
+	if (!pointer->Init(Client(), Version(), id)) {
 		return;
 	}
 	fGlobal->fPointerIfaces.Insert(pointer);
@@ -625,7 +658,7 @@ void HaikuSeat::HandleGetKeyboard(uint32_t id)
 		wl_client_post_no_memory(Client());
 		return;
 	}
-	if (!keyboard->Init(Client(), wl_resource_get_version(ToResource()), id)) {
+	if (!keyboard->Init(Client(), Version(), id)) {
 		return;
 	}
 	fGlobal->fKeyboardIfaces.Insert(keyboard);

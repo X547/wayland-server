@@ -1,5 +1,8 @@
 #include "WaylandServer.h"
+#include "WaylandEnv.h"
+
 #include "Wayland.h"
+#include "HaikuShm.h"
 #include "HaikuCompositor.h"
 #include "HaikuSubcompositor.h"
 #include "HaikuXdgShell.h"
@@ -9,156 +12,116 @@
 #include "HaikuDataDeviceManager.h"
 #include "HaikuSeat.h"
 #include "HaikuServerDecoration.h"
-#include "WaylandEnv.h"
-
-#include <wayland-server-core.h>
-#include <wayland-server-protocol.h>
-#include <xdg-shell-protocol.h>
-#include <stdio.h>
-#include <new>
 
 #include <Application.h>
-#include <OS.h>
-#include "AppKitPtrs.h"
+
+#include <AutoDeleter.h>
 
 
 static void Assert(bool cond) {if (!cond) abort();}
 
-extern "C" void
-wl_client_dispatch(struct wl_client *client, struct wl_closure *closure);
 
-typedef int (*client_enqueue_proc)(void *client_display, struct wl_closure *closure);
+BLooper *WaylandServer::sLooper;
 
 
-static struct wl_display *sDisplay;
-
-ServerHandler gServerHandler;
-BMessenger gServerMessenger;
-
-ServerHandler::ServerHandler(): BHandler("server")
-{}
-
-void ServerHandler::MessageReceived(BMessage *msg)
-{
-	switch (msg->what) {
-	case closureSendMsg: {
-		struct wl_client *client;
-		msg->FindPointer("client", (void**)&client);
-		struct wl_closure *closure;
-		msg->FindPointer("closure", (void**)&closure);
-		wl_client_dispatch(client, closure);
-		return;
-	}
-	default:
-		break;
-	}
-	BHandler::MessageReceived(msg);
-}
-
-
-class Application: public BApplication {
+class WaylandApplication: public BApplication {
 private:
-	// TODO: support multiple clients
-	struct wl_client *fClient{};
+	WaylandServer *fWlServer;
 
 public:
-	Application();
-	virtual ~Application() = default;
-
-	void AddClient(struct wl_client *client);
+	WaylandApplication(WaylandServer *wlServer);
+	virtual ~WaylandApplication() = default;
 
 	thread_id Run() override;
 	void Quit() override;
 	void MessageReceived(BMessage *msg) override;
 };
 
-Application::Application(): BApplication("application/x-vnd.Wayland-App")
+
+WaylandApplication::WaylandApplication(WaylandServer *wlServer):
+	BApplication("application/x-vnd.Wayland-App"),
+	fWlServer(wlServer)
 {
 }
 
-void Application::AddClient(struct wl_client *client)
-{
-	fClient = client;
-}
-
-thread_id Application::Run()
+thread_id WaylandApplication::Run()
 {
 	return BLooper::Run();
 }
 
-void Application::Quit()
+void WaylandApplication::Quit()
 {
 	BApplication::Quit();
 	exit(0);
 }
 
-void Application::MessageReceived(BMessage *msg)
+void WaylandApplication::MessageReceived(BMessage *msg)
 {
 	switch (msg->what) {
 	case B_KEY_MAP_LOADED:
-		if (fClient == NULL) return;
 		WaylandEnv env(this);
-		HaikuSeatGlobal *seat = HaikuGetSeat(fClient);
-		if (seat == NULL) return;
-		seat->UpdateKeymap();
+		fWlServer->fSeatGlobal->UpdateKeymap();
 		return;
 	}
 	return BApplication::MessageReceived(msg);
 }
 
 
-//#pragma mark - entry points
-
-extern "C" _EXPORT int wl_ips_client_connected(void **clientOut, void *clientDisplay, client_enqueue_proc display_enqueue)
+WaylandServer *WaylandServer::Create(struct wl_display *display)
 {
-	if (be_app == NULL) {
-		new Application();
-		be_app->Run();
+	ObjectDeleter<WaylandServer> wlServer(new(std::nothrow) WaylandServer(display));
+	if (!wlServer.IsSet()) {
+		return NULL;
 	}
-	if (gServerHandler.Looper() == NULL) {
-		AppKitPtrs::LockedPtr(be_app)->AddHandler(&gServerHandler);
-		gServerMessenger.SetTo(&gServerHandler);
+	if (wlServer->Init() < B_OK) {
+		return NULL;
 	}
-
-	fprintf(stderr, "wl_ips_client_connected\n");
-	if (sDisplay == NULL) {
-		sDisplay = wl_display_create();
-
-		Assert(wl_display_init_shm(sDisplay) == 0);
-		Assert(HaikuCompositorGlobal::Create(sDisplay) != NULL);
-		Assert(HaikuSubcompositorGlobal::Create(sDisplay) != NULL);
-		Assert(HaikuOutputGlobal::Create(sDisplay) != NULL);
-		Assert(HaikuDataDeviceManagerGlobal::Create(sDisplay) != NULL);
-		Assert(HaikuSeatGlobal::Create(sDisplay) != NULL);
-		Assert(HaikuXdgShell::Create(sDisplay) != NULL);
-		Assert(HaikuServerDecorationManagerGlobal::Create(sDisplay) != NULL);
-	}
-	fprintf(stderr, "display: %p\n", sDisplay);
-	struct wl_client *client = wl_client_create_ips(sDisplay, clientDisplay, display_enqueue);
-	fprintf(stderr, "client: %p\n", client);
-	static_cast<Application*>(be_app)->AddClient(client);
-
-	*clientOut = client;
-
-	return 0;
-/*
-	wl_client_destroy(client);
-	wl_display_destroy(display);
-*/
+	return wlServer.Detach();
 }
 
-extern "C" _EXPORT int wl_ips_closure_send(void *clientIn, struct wl_closure *closure)
+status_t WaylandServer::Init()
 {
-	struct wl_client *client = (struct wl_client*)clientIn;
+	fApplication = new WaylandApplication(this);
+	sLooper = fApplication;
+	fApplication->Run();
 
-	if (true) {
-		BMessage msg(ServerHandler::closureSendMsg);
-		msg.AddPointer("client", client);
-		msg.AddPointer("closure", closure);
-		gServerMessenger.SendMessage(&msg);
-	} else {
-		wl_client_dispatch(client, closure);
-	}
+	fprintf(stderr, "WaylandServer::fDisplay: %p\n", fDisplay);
 
-	return 0;
+	// TODO: do not crash on failure
+	//Assert(wl_display_init_shm(fDisplay) == 0);
+	Assert(HaikuShmGlobal::Create(fDisplay) != NULL);
+	Assert(HaikuCompositorGlobal::Create(fDisplay) != NULL);
+	Assert(HaikuSubcompositorGlobal::Create(fDisplay) != NULL);
+	Assert(HaikuOutputGlobal::Create(fDisplay) != NULL);
+	Assert(HaikuDataDeviceManagerGlobal::Create(fDisplay) != NULL);
+	Assert((fSeatGlobal = HaikuSeatGlobal::Create(fDisplay)) != NULL);
+	Assert(HaikuXdgShell::Create(fDisplay) != NULL);
+	Assert(HaikuServerDecorationManagerGlobal::Create(fDisplay) != NULL);
+
+	return B_OK;
+}
+
+WaylandServer::~WaylandServer()
+{
+	// TODO
+}
+
+
+void WaylandServer::Lock()
+{
+	sLooper->Lock();
+}
+
+void WaylandServer::Unlock()
+{
+	sLooper->Unlock();
+}
+
+
+void WaylandServer::ClientConnected(struct wl_client *client)
+{
+}
+
+void WaylandServer::ClientDisconnected(struct wl_client *client)
+{
 }

@@ -1,5 +1,6 @@
 #include "HaikuCompositor.h"
 #include "HaikuSubcompositor.h"
+#include "HaikuShm.h"
 #include "HaikuXdgSurface.h"
 #include "HaikuXdgToplevel.h"
 #include "HaikuXdgPopup.h"
@@ -9,6 +10,7 @@
 #include <wayland-server-core.h>
 #include <wayland-server-protocol.h>
 #include <stdio.h>
+#include <bit>
 
 #include "AppKitPtrs.h"
 #include <Application.h>
@@ -44,11 +46,15 @@ public:
 
 void HaikuRegion::HandleAdd(int32_t x, int32_t y, int32_t width, int32_t height)
 {
+	width = std::min(width, 1 << 24);
+	height = std::min(height, 1 << 24);
 	fRegion.Include(BRect(x, y, x + width - 1, y + height - 1));
 }
 
 void HaikuRegion::HandleSubtract(int32_t x, int32_t y, int32_t width, int32_t height)
 {
+	width = std::min(width, 1 << 24);
+	height = std::min(height, 1 << 24);
 	fRegion.Exclude(BRect(x, y, x + width - 1, y + height - 1));
 }
 
@@ -88,7 +94,7 @@ void HaikuCompositorGlobal::Bind(struct wl_client *wl_client, uint32_t version, 
 
 void HaikuCompositor::HandleCreateSurface(uint32_t id)
 {
-	HaikuSurface *surface = HaikuSurface::Create(Client(), wl_resource_get_version(ToResource()), id);
+	HaikuSurface *surface = HaikuSurface::Create(Client(), Version(), id);
 }
 
 void HaikuCompositor::HandleCreateRegion(uint32_t id)
@@ -98,7 +104,7 @@ void HaikuCompositor::HandleCreateRegion(uint32_t id)
 		wl_client_post_no_memory(Client());
 		return;
 	}
-	if (!region->Init(Client(), wl_resource_get_version(ToResource()), id)) {
+	if (!region->Init(Client(), Version(), id)) {
 		return;
 	}
 }
@@ -136,6 +142,11 @@ void WaylandView::WindowActivated(bool active)
 	WaylandEnv wlEnv(this);
 	HaikuSeatGlobal *seat = HaikuGetSeat(fSurface->Client());
 	if (seat == NULL) return;
+
+	if (fSurface->Subsurface() != NULL) {
+		return;
+	}
+
 	seat->SetKeyboardFocus(fSurface, active);
 }
 
@@ -145,7 +156,12 @@ void WaylandView::MessageReceived(BMessage *msg)
 		WaylandEnv wlEnv(this);
 		HaikuSeatGlobal *seat = HaikuGetSeat(fSurface->Client());
 
-		if (seat != NULL && seat->MessageReceived(fSurface, msg)) {
+		HaikuSurface *surface = fSurface;
+		while (surface->Subsurface() != NULL) {
+			surface = surface->Subsurface()->Parent();
+		}
+
+		if (seat != NULL && seat->MessageReceived(surface, msg)) {
 			return;
 		}
 	}
@@ -187,8 +203,6 @@ HaikuSurface *HaikuSurface::Create(struct wl_client *client, uint32_t version, u
 
 HaikuSurface::~HaikuSurface()
 {
-	fHook.Unset();
-	CallFrameCallbacks();
 /*
 	if (fView != NULL) {
 		fView->RemoveSelf();
@@ -212,29 +226,38 @@ void HaikuSurface::AttachWindow(BWindow *window)
 
 void HaikuSurface::AttachView(BView *view)
 {
+	if (view == NULL) {
+		fprintf(stderr, "[!] HaikuSurface::AttachView(): view == NULL\n");
+		return;
+	}
 	fView = new WaylandView(this);
 	view->AddChild(fView);
 }
 
 void HaikuSurface::Detach()
 {
+	if (fView == NULL) {
+		return;
+	}
 	fView->LockLooper();
 	BLooper *looper = fView->Looper();
 	fView->RemoveSelf();
-	looper->Unlock();
+	if (looper != NULL) {
+		looper->Unlock();
+	}
 	fView = NULL;
 }
 
 void HaikuSurface::Invalidate()
 {
-	AppKitPtrs::LockedPtr(fView)->Invalidate(&fDirty);
+	AppKitPtrs::LockedPtr(fView)->Invalidate(/*&fDirty*/);
 	fDirty.MakeEmpty();
 }
 
 void HaikuSurface::CallFrameCallbacks()
 {
-	while (!fFrameCallbacks.IsEmpty()) {
-		FrameCallback *callback = fFrameCallbacks.RemoveHead();
+	while (!fState.frameCallbacks.IsEmpty()) {
+		FrameCallback *callback = fState.frameCallbacks.RemoveHead();
 		callback->SendDone(system_time()/1000);
 		callback->Destroy();
 	}
@@ -249,67 +272,82 @@ void HaikuSurface::SetHook(Hook *hook)
 
 void HaikuSurface::HandleAttach(struct wl_resource *buffer_resource, int32_t dx, int32_t dy)
 {
-	// printf("HaikuSurface::HandleAttach(%p, %" PRId32 ", %" PRId32 ")\n", buffer_resource, dx, dy);
-	fPendingState.buffer = buffer_resource; // TODO: handle delete
+	fPendingState.buffer = HaikuShmBuffer::FromResource(buffer_resource);
 	fPendingState.dx = dx;
 	fPendingState.dy = dy;
-	fBufferAttached = true;
+	fPendingFields |= (1 << fieldBuffer) | (1 << fieldOffset);
 }
 
 void HaikuSurface::HandleDamage(int32_t x, int32_t y, int32_t width, int32_t height)
 {
+	width = std::min(width, 1 << 24);
+	height = std::min(height, 1 << 24);
 	fDirty.Include(BRect(x, y, x + width - 1, y + height - 1));
 }
 
 void HaikuSurface::HandleFrame(uint32_t callback_id)
 {
-	fFrameCallbacks.Insert(FrameCallback::Create(Client(), 1, callback_id));
+	fPendingState.frameCallbacks.Insert(FrameCallback::Create(Client(), 1, callback_id));
+	fPendingFields |= (1 << fieldFrameCallbacks);
 }
 
 void HaikuSurface::HandleSetOpaqueRegion(struct wl_resource *region_resource)
 {
-	fState.valid.opaqueRgn = region_resource != NULL;
-	fState.opaqueRgn = region_resource == NULL ? BRegion() : HaikuRegion::FromResource(region_resource)->Region();
+	if (region_resource == NULL) {
+		fPendingState.opaqueRgn.reset();
+	} else {
+		fPendingState.opaqueRgn.emplace(HaikuRegion::FromResource(region_resource)->Region());
+	}
+	fPendingFields |= (1 << fieldOpaqueRgn);
 }
 
 void HaikuSurface::HandleSetInputRegion(struct wl_resource *region_resource)
 {
-	fState.valid.inputRgn = region_resource != NULL;
-	fState.inputRgn = region_resource == NULL ? BRegion() : HaikuRegion::FromResource(region_resource)->Region();
+	if (region_resource == NULL) {
+		fPendingState.inputRgn.reset();
+	} else {
+		fPendingState.inputRgn.emplace(HaikuRegion::FromResource(region_resource)->Region());
+	}
+	fPendingFields |= (1 << fieldInputRgn);
 }
 
 void HaikuSurface::HandleCommit()
 {
 	//printf("HaikuSurface::HandleCommit()\n");
 
-	struct wl_resource *oldBuffer = fState.buffer;
-	fState = fPendingState;
-/*
-	if (oldBuffer != NULL && oldBuffer != fState.buffer) {
-		wl_buffer_send_release(oldBuffer);
-	}
-*/
-
-	if (fState.buffer != NULL) {
-		struct wl_shm_buffer *shmBuffer = fState.buffer == NULL ? NULL : wl_shm_buffer_get(fState.buffer);
-		if (fBufferAttached) {
-			fBuffer = {
-				.stride = wl_shm_buffer_get_stride(shmBuffer),
-				.data = wl_shm_buffer_get_data(shmBuffer),
-				.format = wl_shm_buffer_get_format(shmBuffer),
-				.width = wl_shm_buffer_get_width(shmBuffer),
-				.height = wl_shm_buffer_get_height(shmBuffer)
-			};
-
-			fBitmap.SetTo(new BBitmap(BRect(0, 0, fBuffer.width - 1, fBuffer.height - 1), 0, B_RGBA32));
-			fBitmap->ImportBits(fBuffer.data, fBuffer.stride*fBuffer.height, fBuffer.stride, 0, B_RGBA32);
-
-			fBufferAttached = false;
-			wl_buffer_send_release(fState.buffer);
+	for (;;) {
+		uint32 field = std::countr_zero(fPendingFields);
+		if (field >= 32) {
+			break;
 		}
-	} else {
-		fBuffer = {};
-		fBitmap.Unset();
+		fPendingFields &= ~(1U << field);
+		switch (field) {
+			case fieldBuffer:
+				if (fState.buffer != NULL && fState.buffer != fPendingState.buffer) {
+					fState.buffer->SendRelease();
+				}
+				fState.buffer = fPendingState.buffer;
+				break;
+			case fieldOffset:
+				fState.dx = fPendingState.dx;
+				fState.dy = fPendingState.dy;
+				break;
+			case fieldTransform:
+				fState.transform = fPendingState.transform;
+				break;
+			case fieldScale:
+				fState.scale = fPendingState.scale;
+				break;
+			case fieldOpaqueRgn:
+				fState.opaqueRgn = std::move(fPendingState.opaqueRgn);
+				break;
+			case fieldInputRgn:
+				fState.inputRgn = std::move(fPendingState.inputRgn);
+				break;
+			case fieldFrameCallbacks:
+				fState.frameCallbacks.MoveFrom(&fPendingState.frameCallbacks);
+				break;
+		}
 	}
 
 	if (View() != NULL) {
@@ -327,19 +365,25 @@ void HaikuSurface::HandleCommit()
 void HaikuSurface::HandleSetBufferTransform(int32_t transform)
 {
 	fPendingState.transform = transform;
+	fPendingFields |= (1 << fieldTransform);
 }
 
 void HaikuSurface::HandleSetBufferScale(int32_t scale)
 {
 	fPendingState.scale = scale;
+	fPendingFields |= (1 << fieldScale);
 }
 
 void HaikuSurface::HandleDamageBuffer(int32_t x, int32_t y, int32_t width, int32_t height)
 {
+	width = std::min(width, 1 << 24);
+	height = std::min(height, 1 << 24);
+	fDirty.Include(BRect(x, y, x + width - 1, y + height - 1));
 }
 
 void HaikuSurface::HandleOffset(int32_t x, int32_t y)
 {
 	fPendingState.dx = x;
 	fPendingState.dy = y;
+	fPendingFields |= (1 << fieldOffset);
 }

@@ -2,6 +2,7 @@
 #include "Wayland.h"
 #include "WlGlobal.h"
 #include "XdgShell.h"
+#include "HaikuDataDeviceManager.h"
 #include <SupportDefs.h>
 #include <Point.h>
 #include <Locker.h>
@@ -12,6 +13,7 @@ class BMessage;
 class HaikuSurface;
 class HaikuSeatGlobal;
 class HaikuDataDevice;
+class HaikuDataOffer;
 
 class HaikuPointer: public WlPointer {
 private:
@@ -69,17 +71,19 @@ private:
 		bool inside;
 		BPoint origin;
 		int32_t wndWidth, wndHeight;
+		HaikuDataOffer *dataOffer;
 		TrackInfo info;
 	};
 
 	uint32_t fSerial = 1;
 	HaikuPointer::List fPointerIfaces{};
 	HaikuKeyboard::List fKeyboardIfaces{};
-	HaikuDataDevice *fDataDevice{};
+	HaikuDataDeviceManagerGlobal *fDataDeviceGlobal{};
+	HaikuDataDevice::List fDataDevices{};
 	HaikuSurface *fPointerFocus{};
 	HaikuSurface *fKeyboardFocus{};
 	uint32 fOldMouseBtns{};
-	Track fTrack;
+	Track fTrack{};
 
 	uint32_t NextSerial();
 

@@ -129,7 +129,7 @@ void HaikuXdgToplevel::HandleSetParent(struct wl_resource *_parent)
 		}
 	} else {
 		XdgSurface()->fRoot = parent->XdgSurface()->fRoot;
-		fWindow->SetFeel(B_FLOATING_SUBSET_WINDOW_FEEL);
+		fWindow->SetFeel(B_MODAL_SUBSET_WINDOW_FEEL);
 		fWindow->AddToSubset(parent->XdgSurface()->fRoot->Window());
 	}
 }

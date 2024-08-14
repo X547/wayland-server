@@ -22,11 +22,11 @@ void SubsurfaceHook::HandleCommit()
 {
 	HaikuSurface *surf = Base();
 	HaikuSubsurface *subsurf = surf->Subsurface();
-	AppKitPtrs::LockedPtr(surf->View())->MoveTo(subsurf->GetState().x, subsurf->GetState().y);
 
 	BBitmap *bitmap = Base()->Bitmap();
 	if (Base()->View() != NULL) {
 		auto viewLocked = AppKitPtrs::LockedPtr(Base()->View());
+		viewLocked->MoveTo(subsurf->GetState().x, subsurf->GetState().y);
 		if (bitmap != NULL) {
 			viewLocked->ResizeTo(bitmap->Bounds().Width(), bitmap->Bounds().Height());
 		}
@@ -69,7 +69,7 @@ void HaikuSubcompositorGlobal::Bind(struct wl_client *wl_client, uint32_t versio
 
 void HaikuSubcompositor::HandleGetSubsurface(uint32_t id, struct wl_resource *surface, struct wl_resource *parent)
 {
-	HaikuSubsurface *subsurface = HaikuSubsurface::Create(Client(), wl_resource_get_version(ToResource()), id, surface, parent);
+	HaikuSubsurface *subsurface = HaikuSubsurface::Create(Client(), Version(), id, surface, parent);
 }
 
 

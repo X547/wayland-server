@@ -1,20 +1,39 @@
 #pragma once
 
-#include <Handler.h>
-#include <Messenger.h>
+#include <wayland-server-core.h>
+#include <SupportDefs.h>
 
 
-class ServerHandler: public BHandler {
+class BLooper;
+class HaikuSeatGlobal;
+class WaylandApplication;
+
+
+class _EXPORT WaylandServer {
+private:
+	friend class WaylandApplication;
+
+	static BLooper *sLooper;
+
+	struct wl_display *fDisplay{};
+
+	WaylandApplication* fApplication {};
+	HaikuSeatGlobal *fSeatGlobal {};
+
+	status_t Init();
+
 public:
-	enum {
-		closureSendMsg = 1,
-	};
+	static WaylandServer *Create(struct wl_display *display);
+	WaylandServer(struct wl_display *display): fDisplay(display) {}
+	~WaylandServer();
 
-	ServerHandler();
-	virtual ~ServerHandler() = default;
+	static inline BLooper *GetLooper() {return sLooper;}
 
-	void MessageReceived(BMessage *msg) final;
+	void Lock();
+	void Unlock();
+
+	inline struct wl_display *GetDisplay() {return fDisplay;}
+
+	void ClientConnected(struct wl_client *client);
+	void ClientDisconnected(struct wl_client *client);
 };
-
-extern ServerHandler gServerHandler;
-extern BMessenger gServerMessenger;

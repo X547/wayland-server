@@ -1,6 +1,7 @@
 #pragma once
 
 #include "WaylandServer.h"
+#include <Looper.h>
 
 
 class WaylandEnv {
@@ -12,12 +13,12 @@ public:
 		fHandler(handler)
 	{
 		fHandler->UnlockLooper();
-		gServerHandler.LockLooper();
+		WaylandServer::GetLooper()->Lock();
 	}
 
 	inline ~WaylandEnv()
 	{
-		gServerHandler.UnlockLooper();
+		WaylandServer::GetLooper()->Unlock();
 		fHandler->LockLooper();
 	}
 };

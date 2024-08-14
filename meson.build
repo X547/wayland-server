@@ -88,24 +88,46 @@ foreach name, path : protocols_cpp
 endforeach
 
 
+libwayland_server = shared_library('wayland-server-core',
+	'WaylandServer.cpp',
+	'WaylandServerIps2.cpp',
+	'WlResource.cpp',
+	'WlGlobal.cpp',
+	'HaikuShm.cpp',
+	'HaikuCompositor.cpp',
+	'HaikuSubcompositor.cpp',
+	'HaikuXdgShell.cpp',
+	'HaikuXdgPositioner.cpp',
+	'HaikuXdgSurface.cpp',
+	'HaikuXdgToplevel.cpp',
+	'HaikuXdgPopup.cpp',
+	'HaikuServerDecoration.cpp',
+	'HaikuOutput.cpp',
+	'HaikuSeat.cpp',
+	'XkbKeymap.cpp',
+	'HaikuDataDeviceManager.cpp',
+	wl_files,
+	include_directories: [
+		'/boot/system/develop/headers/private/shared',
+		'/boot/system/develop/headers/private/interface',
+		'/boot/system/develop/headers/private/system',
+		'/boot/system/develop/headers/private/system/arch/x86_64',
+	],
+	dependencies: [
+		cpp.find_library('be'),
+		wlserverdep,
+	],
+	gnu_symbol_visibility: 'hidden',
+	install: true
+)
+
+dep_libwayland_server = declare_dependency(
+	link_with: libwayland_server
+)
+
 shared_library('wayland-server-inproc',
 	[
-		'WaylandServer.cpp',
-		'WlResource.cpp',
-		'WlGlobal.cpp',
-		'HaikuCompositor.cpp',
-		'HaikuSubcompositor.cpp',
-		'HaikuXdgShell.cpp',
-		'HaikuXdgPositioner.cpp',
-		'HaikuXdgSurface.cpp',
-		'HaikuXdgToplevel.cpp',
-		'HaikuXdgPopup.cpp',
-		'HaikuServerDecoration.cpp',
-		'HaikuOutput.cpp',
-		'HaikuSeat.cpp',
-		'XkbKeymap.cpp',
-		'HaikuDataDeviceManager.cpp',
-		wl_files
+		'WaylandServerIps.cpp',
 	],
 	name_prefix: '',
 	include_directories: [
@@ -115,7 +137,8 @@ shared_library('wayland-server-inproc',
 	dependencies: [
 		cpp.find_library('be'),
 		wlserverdep,
+		dep_libwayland_server
 	],
 	gnu_symbol_visibility: 'hidden',
-	install : true
+	install: true
 )

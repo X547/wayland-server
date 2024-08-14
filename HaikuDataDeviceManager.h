@@ -7,8 +7,12 @@
 #include <Looper.h>
 #include <Handler.h>
 
+#include <AutoDeleter.h>
+#include <private/kernel/util/DoublyLinkedList.h>
+
 
 class HaikuSeat;
+class HaikuSeatGlobal;
 class HaikuDataDevice;
 
 class HaikuDataSource: public WlDataSource {
@@ -16,10 +20,20 @@ private:
 	friend class HaikuDataOffer;
 	friend class HaikuDataDevice;
 
-	HaikuDataDevice *fDataDevice{};
-	std::set<std::string> fMimeTypes;
+	class Handler: public BHandler {
+	private:
+		HaikuDataSource *fBase;
 
-	static void ConvertToHaikuMessage(BMessage &dstMsg, const BMessage &srcMsg);
+	public:
+		virtual ~Handler() = default;
+		Handler(HaikuDataSource *base): BHandler("HaikuDataSource"), fBase(base) {}
+		void MessageReceived(BMessage *msg) final;
+	};
+
+	HaikuDataDevice *fDataDevice{};
+	ObjectDeleter<Handler> fHandler;
+	std::set<std::string> fMimeTypes;
+	uint32_t fSupportedDndActions {};
 
 
 public:
@@ -28,8 +42,8 @@ public:
 
 	std::set<std::string> &MimeTypes() {return fMimeTypes;}
 
-	status_t ReadData(std::vector<uint8> &data, const char *mimeType);
 	BMessage *ToMessage();
+	BHandler *GetHandler() {return fHandler.Get();}
 
 	void HandleOffer(const char *mimeType) final;
 	void HandleSetActions(uint32_t dndActions) final;
@@ -38,10 +52,17 @@ public:
 class HaikuDataOffer: public WlDataOffer {
 private:
 	BMessage fData;
+	ObjectDeleter<BMessage> fDropMessage;
+	uint32_t fDndActions {};
+	uint32_t fPreferredAction {};
+	std::string fAcceptedType;
+	bool fReplySent = false;
 
 public:
 	static HaikuDataOffer *Create(HaikuDataDevice *dataDevice, const BMessage &data);
 	static HaikuDataOffer *FromResource(struct wl_resource *resource) {return (HaikuDataOffer*)WlResource::FromResource(resource);}
+
+	void DropMessageReceived(BMessage *msg) {fDropMessage.SetTo(msg);}
 
 	void HandleAccept(uint32_t serial, const char *mime_type) final;
 	void HandleReceive(const char *mime_type, int32_t fd) final;
@@ -53,7 +74,8 @@ class HaikuDataDevice: public WlDataDevice {
 private:
 	friend class HaikuDataSource;
 
-	HaikuSeat *fSeat;
+	DoublyLinkedListLink<HaikuDataDevice> fLink;
+	HaikuSeatGlobal *fSeat;
 	HaikuDataSource *fDataSource;
 
 	class ClipboardWatcher: public BHandler {
@@ -66,6 +88,8 @@ private:
 	} fClipboardWatcher;
 
 public:
+	typedef DoublyLinkedList<HaikuDataDevice, DoublyLinkedListMemberGetLink<HaikuDataDevice, &HaikuDataDevice::fLink>> List;
+
 	static HaikuDataDevice *Create(struct wl_client *client, uint32_t version, uint32_t id, struct wl_resource *seat);
 	static HaikuDataDevice *FromResource(struct wl_resource *resource) {return (HaikuDataDevice*)WlResource::FromResource(resource);}
 	virtual ~HaikuDataDevice();
