@@ -25,13 +25,22 @@ public:
 	void HandleCreatePool(uint32_t id, int32_t fd, int32_t size) final;
 };
 
+class HaikuShmAreaRef: public BReferenceable {
+private:
+	AreaDeleter fArea;
+
+public:
+	HaikuShmAreaRef(area_id area): fArea(area) {}
+	area_id Area() const {return fArea.Get();}
+};
+
 class HaikuShmPool: public WlShmPool {
 private:
 	friend class HaikuShm;
 	friend class HaikuShmBuffer;
 
 	FileDescriptorCloser fFd;
-	AreaDeleter fArea;
+	BReference<HaikuShmAreaRef> fAreaRef;
 	void *fAddress {};
 	size_t fSize {};
 
@@ -47,6 +56,7 @@ class HaikuShmBuffer: public WlBuffer, public BReferenceable {
 private:
 	friend class HaikuShmPool;
 
+	BReference<HaikuShmAreaRef> fAreaRef;
 	std::optional<BBitmap> fBitmap;
 
 public:
