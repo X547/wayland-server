@@ -43,6 +43,7 @@ private:
 	friend class HaikuXdgToplevel;
 	friend class HaikuServerDecoration;
 	friend class HaikuSubsurface;
+	friend class WaylandView;
 
 	class FrameCallback: public WlCallback {
 	private:
