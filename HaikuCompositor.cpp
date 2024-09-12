@@ -117,6 +117,7 @@ public:
 
 	HaikuSurface *Surface() {return fSurface;}
 
+	void DetachedFromWindow() final;
 	void WindowActivated(bool active) final;
 	void MessageReceived(BMessage *msg) final;
 	void Draw(BRect dirty);
@@ -129,6 +130,14 @@ WaylandView::WaylandView(HaikuSurface *surface):
 {
 	SetDrawingMode(B_OP_ALPHA);
 	SetViewColor(B_TRANSPARENT_COLOR);
+}
+
+void WaylandView::DetachedFromWindow()
+{
+	WaylandEnv wlEnv(this);
+	if (fSurface != NULL) {
+		fSurface->fView = NULL;
+	}
 }
 
 void WaylandView::WindowActivated(bool active)
@@ -189,13 +198,6 @@ HaikuSurface::~HaikuSurface()
 {
 	fHook.Unset();
 	CallFrameCallbacks();
-/*
-	if (fView != NULL) {
-		fView->RemoveSelf();
-		delete fView;
-		fView = NULL;
-	}
-*/
 	HaikuSeatGlobal *seat = HaikuGetSeat(Client());
 	if (seat != NULL) {
 		seat->SetPointerFocus(this, false, BMessage());
@@ -218,15 +220,24 @@ void HaikuSurface::AttachView(BView *view)
 
 void HaikuSurface::Detach()
 {
+	if (fView == NULL) {
+		return;
+	}
 	fView->LockLooper();
 	BLooper *looper = fView->Looper();
 	fView->RemoveSelf();
-	looper->Unlock();
+	if (looper != NULL) {
+		looper->Unlock();
+	}
+	delete fView;
 	fView = NULL;
 }
 
 void HaikuSurface::Invalidate()
 {
+	if (fView == NULL) {
+		return;
+	}
 	AppKitPtrs::LockedPtr(fView)->Invalidate(&fDirty);
 	fDirty.MakeEmpty();
 }

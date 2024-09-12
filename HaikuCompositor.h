@@ -40,6 +40,7 @@ private:
 	friend class HaikuXdgToplevel;
 	friend class HaikuServerDecoration;
 	friend class HaikuSubsurface;
+	friend class WaylandView;
 
 	struct Buffer {
 		int32_t stride{};
