@@ -221,7 +221,7 @@ HaikuXdgToplevel *HaikuXdgToplevel::Create(HaikuXdgSurface *xdgSurface, uint32_t
 		wl_client_post_no_memory(xdgSurface->Client());
 		return NULL;
 	}
-	if (!xdgToplevel->Init(xdgSurface->Client(), wl_resource_get_version(xdgSurface->ToResource()), id)) {
+	if (!xdgToplevel->Init(xdgSurface->Client(), xdgSurface->Version(), id)) {
 		return NULL;
 	}
 

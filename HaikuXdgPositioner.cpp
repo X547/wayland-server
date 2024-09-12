@@ -267,7 +267,7 @@ HaikuXdgPositioner *HaikuXdgPositioner::Create(HaikuXdgWmBase *client, uint32_t 
 		wl_client_post_no_memory(client->Client());
 		return NULL;
 	}
-	if (!positioner->Init(client->Client(), wl_resource_get_version(client->ToResource()), id)) {
+	if (!positioner->Init(client->Client(), client->Version(), id)) {
 		return NULL;
 	}
 	return positioner;

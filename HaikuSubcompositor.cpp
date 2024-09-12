@@ -69,7 +69,7 @@ void HaikuSubcompositorGlobal::Bind(struct wl_client *wl_client, uint32_t versio
 
 void HaikuSubcompositor::HandleGetSubsurface(uint32_t id, struct wl_resource *surface, struct wl_resource *parent)
 {
-	HaikuSubsurface *subsurface = HaikuSubsurface::Create(Client(), wl_resource_get_version(ToResource()), id, surface, parent);
+	HaikuSubsurface *subsurface = HaikuSubsurface::Create(Client(), Version(), id, surface, parent);
 }
 
 

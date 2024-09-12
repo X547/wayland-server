@@ -68,7 +68,7 @@ HaikuXdgPopup *HaikuXdgPopup::Create(HaikuXdgSurface *xdgSurface, uint32_t id, s
 		wl_client_post_no_memory(xdgSurface->Client());
 		return NULL;
 	}
-	if (!xdgPopup->Init(xdgSurface->Client(), wl_resource_get_version(xdgSurface->ToResource()), id)) {
+	if (!xdgPopup->Init(xdgSurface->Client(), xdgSurface->Version(), id)) {
 		return NULL;
 	}
 

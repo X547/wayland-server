@@ -62,7 +62,7 @@ HaikuServerDecoration *HaikuServerDecoration::Create(HaikuServerDecorationManage
 		wl_client_post_no_memory(manager->Client());
 		return NULL;
 	}
-	if (!serverDecor->Init(manager->Client(), wl_resource_get_version(manager->ToResource()), id)) {
+	if (!serverDecor->Init(manager->Client(), manager->Version(), id)) {
 		return NULL;
 	}
 	serverDecor->fSurface = surface;

@@ -219,7 +219,7 @@ HaikuXdgSurface *HaikuXdgSurface::Create(struct HaikuXdgWmBase *client, struct H
 		wl_client_post_no_memory(client->Client());
 		return NULL;
 	}
-	if (!xdgSurface->Init(client->Client(), wl_resource_get_version(client->ToResource()), id)) {
+	if (!xdgSurface->Init(client->Client(), client->Version(), id)) {
 		return NULL;
 	}
 	xdgSurface->fSurface = surface;

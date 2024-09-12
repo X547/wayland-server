@@ -612,7 +612,7 @@ void HaikuSeat::HandleGetPointer(uint32_t id)
 		wl_client_post_no_memory(Client());
 		return;
 	}
-	if (!pointer->Init(Client(), wl_resource_get_version(ToResource()), id)) {
+	if (!pointer->Init(Client(), Version(), id)) {
 		return;
 	}
 	fGlobal->fPointerIfaces.Insert(pointer);
@@ -625,7 +625,7 @@ void HaikuSeat::HandleGetKeyboard(uint32_t id)
 		wl_client_post_no_memory(Client());
 		return;
 	}
-	if (!keyboard->Init(Client(), wl_resource_get_version(ToResource()), id)) {
+	if (!keyboard->Init(Client(), Version(), id)) {
 		return;
 	}
 	fGlobal->fKeyboardIfaces.Insert(keyboard);

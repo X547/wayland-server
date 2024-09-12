@@ -88,7 +88,7 @@ void HaikuCompositorGlobal::Bind(struct wl_client *wl_client, uint32_t version, 
 
 void HaikuCompositor::HandleCreateSurface(uint32_t id)
 {
-	HaikuSurface *surface = HaikuSurface::Create(Client(), wl_resource_get_version(ToResource()), id);
+	HaikuSurface *surface = HaikuSurface::Create(Client(), Version(), id);
 }
 
 void HaikuCompositor::HandleCreateRegion(uint32_t id)
@@ -98,7 +98,7 @@ void HaikuCompositor::HandleCreateRegion(uint32_t id)
 		wl_client_post_no_memory(Client());
 		return;
 	}
-	if (!region->Init(Client(), wl_resource_get_version(ToResource()), id)) {
+	if (!region->Init(Client(), Version(), id)) {
 		return;
 	}
 }

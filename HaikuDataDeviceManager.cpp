@@ -128,7 +128,7 @@ HaikuDataOffer *HaikuDataOffer::Create(HaikuDataDevice *dataDevice, const BMessa
 		wl_client_post_no_memory(dataDevice->Client());
 		return NULL;
 	}
-	if (!dataOffer->Init(dataDevice->Client(), wl_resource_get_version(dataDevice->ToResource()), 0)) {
+	if (!dataOffer->Init(dataDevice->Client(), dataDevice->Version(), 0)) {
 		return NULL;
 	}
 
@@ -305,12 +305,12 @@ void HaikuDataDeviceManager::HandleCreateDataSource(uint32_t id)
 		wl_client_post_no_memory(Client());
 		return;
 	}
-	if (!dataSource->Init(Client(), wl_resource_get_version(ToResource()), id)) {
+	if (!dataSource->Init(Client(), Version(), id)) {
 		return;
 	}
 }
 
 void HaikuDataDeviceManager::HandleGetDataDevice(uint32_t id, struct wl_resource *seat)
 {
-	HaikuDataDevice *dataDevice = HaikuDataDevice::Create(Client(), wl_resource_get_version(ToResource()), id, seat);
+	HaikuDataDevice *dataDevice = HaikuDataDevice::Create(Client(), Version(), id, seat);
 }

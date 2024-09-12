@@ -18,4 +18,5 @@ public:
 	struct wl_resource *ToResource() const {return fResource;}
 	struct wl_client *Client() const {return wl_resource_get_client(fResource);}
 	uint32_t Id() const {return wl_resource_get_id(fResource);}
+	uint32_t Version() const {return wl_resource_get_version(fResource);}
 };
