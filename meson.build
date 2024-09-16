@@ -8,6 +8,11 @@ add_project_arguments('-Wno-unused-variable', language: 'cpp')
 
 cpp = meson.get_compiler('cpp')
 
+arch = build_machine.cpu_family()
+if arch == 'aarch64'
+	arch = 'arm64'
+endif
+
 wlserverdep    = dependency('wayland-server')
 wlprotocolsdep = dependency('wayland-protocols')
 
@@ -93,6 +98,7 @@ shared_library('wayland-server-inproc',
 		'WaylandServer.cpp',
 		'WlResource.cpp',
 		'WlGlobal.cpp',
+		'HaikuShm.cpp',
 		'HaikuCompositor.cpp',
 		'HaikuSubcompositor.cpp',
 		'HaikuXdgShell.cpp',
@@ -111,6 +117,8 @@ shared_library('wayland-server-inproc',
 	include_directories: [
 		'/boot/system/develop/headers/private/shared',
 		'/boot/system/develop/headers/private/interface',
+		'/boot/system/develop/headers/private/system',
+		'/boot/system/develop/headers/private/system/arch/' + arch,
 	],
 	dependencies: [
 		cpp.find_library('be'),

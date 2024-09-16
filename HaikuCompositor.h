@@ -3,9 +3,12 @@
 #include "Wayland.h"
 #include "WlGlobal.h"
 #include "HaikuSubcompositor.h"
+#include "HaikuShm.h"
 #include <AutoDeleter.h>
 #include <Point.h>
 #include <Region.h>
+
+#include <optional>
 
 class HaikuXdgSurface;
 class HaikuServerDecoration;
@@ -42,29 +45,6 @@ private:
 	friend class HaikuSubsurface;
 	friend class WaylandView;
 
-	struct Buffer {
-		int32_t stride{};
-		void *data{};
-		uint32_t format{};
-		int32_t width{}, height{};
-	};
-
-	struct State {
-		union {
-			struct {
-				uint32 opaqueRgn: 1;
-				uint32 inputRgn: 1;
-			};
-			uint32 val;
-		} valid{};
-		struct wl_resource *buffer;
-		int32_t dx = 0, dy = 0;
-		int32_t transform = WlOutput::transformNormal;
-		int32_t scale = 1;
-		BRegion opaqueRgn;
-		BRegion inputRgn;
-	};
-
 	class FrameCallback: public WlCallback {
 	private:
 		DoublyLinkedListLink<FrameCallback> fLink;
@@ -76,22 +56,38 @@ private:
 		virtual ~FrameCallback() = default;
 	};
 
+	enum StateField {
+			fieldBuffer,
+			fieldOffset,
+			fieldTransform,
+			fieldScale,
+			fieldOpaqueRgn,
+			fieldInputRgn,
+			fieldFrameCallbacks
+	};
+
+	struct State {
+		BReference<HaikuShmBuffer> buffer;
+		int32_t dx, dy;
+		int32_t transform = WlOutput::transformNormal;
+		int32_t scale = 1;
+		std::optional<BRegion> opaqueRgn;
+		std::optional<BRegion> inputRgn;
+		FrameCallback::List frameCallbacks;
+	};
+
 	ObjectDeleter<Hook> fHook;
 
-	State fState;
-	State fPendingState;
-	Buffer fBuffer;
-	bool fBufferAttached = false;
+	State fState{};
+	State fPendingState{};
+	uint32 fPendingFields{};
 	BRegion fDirty;
-	ObjectDeleter<BBitmap> fBitmap;
-	WaylandView *fView;
+	WaylandView *fView{};
 	HaikuXdgSurface *fXdgSurface{};
 	HaikuServerDecoration *fServerDecoration{};
 	HaikuSubsurface *fSubsurface{};
 
 	HaikuSubsurface::SurfaceList fSurfaceList;
-
-	FrameCallback::List fFrameCallbacks;
 
 public:
 	static HaikuSurface *Create(struct wl_client *client, uint32_t version, uint32_t id);
@@ -99,7 +95,8 @@ public:
 	virtual ~HaikuSurface();
 
 	BView *View() {return (BView*)fView;}
-	BBitmap *Bitmap() {return fBitmap.Get();}
+	BBitmap *Bitmap() {return fState.buffer == NULL ? NULL : &fState.buffer->Bitmap();}
+	void GetOffset(int32_t &x, int32_t &y) {x = fState.dx; y = fState.dy;}
 	HaikuXdgSurface *XdgSurface() {return fXdgSurface;}
 	HaikuSubsurface *Subsurface() {return fSubsurface;}
 	HaikuServerDecoration *ServerDecoration() {return fServerDecoration;}
