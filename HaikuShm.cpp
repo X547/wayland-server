@@ -112,7 +112,7 @@ void HaikuShmPool::Remap(int32_t size)
 		wl_resource_post_error(ToResource(), HaikuShm::errorInvalidFd, "failed mmap fd %d: %s", fFd.Get(), strerror(area.Get()));
 		return;
 	}
-	fAreaRef = new(std::nothrow) HaikuShmAreaRef(area.Get());
+	fAreaRef.SetTo(new(std::nothrow) HaikuShmAreaRef(area.Get()), true);
 	if (!fAreaRef.IsSet()) {
 		wl_client_post_no_memory(Client());
 		return;
