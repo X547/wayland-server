@@ -178,7 +178,6 @@ public:
 
 void SurfaceCursorHook::HandleCommit()
 {
-#if 1
 	BBitmap *bitmap = Base()->Bitmap();
 	if (bitmap != NULL) {
 		BCursor cursor(bitmap, fHotspot);
@@ -186,7 +185,6 @@ void SurfaceCursorHook::HandleCommit()
 	} else {
 		be_app->SetCursor(B_CURSOR_SYSTEM_DEFAULT, true);
 	}
-#endif
 }
 
 
@@ -204,6 +202,7 @@ void HaikuPointer::HandleSetCursor(uint32_t serial, struct wl_resource *_surface
 		SurfaceCursorHook *hook = new SurfaceCursorHook();
 		hook->fHotspot = BPoint(hotspot_x, hotspot_y);
 		surface->SetHook(hook);
+		hook->HandleCommit();
 	}
 }
 
