@@ -100,7 +100,7 @@ void WaylandWindow::DispatchMessage(BMessage *msg, BHandler *target)
 
 void HaikuXdgToplevel::DoSendConfigure()
 {
-	uint32_t stateArray[4];
+	uint32_t stateArray[3];
 	struct wl_array state {
 		.size = 0,
 		.alloc = sizeof(stateArray),
@@ -110,7 +110,6 @@ void HaikuXdgToplevel::DoSendConfigure()
 
 	if (fState.maximized ) {*p++ = XdgToplevel::stateMaximized;}
 	if (fState.fullscreen) {*p++ = XdgToplevel::stateFullscreen;}
-	if (fState.resizing  ) {*p++ = XdgToplevel::stateResizing;}
 	if (fState.activated ) {*p++ = XdgToplevel::stateActivated;}
 
 	state.size = (uint8_t*)p - (uint8_t*)state.data;
