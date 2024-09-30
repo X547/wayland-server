@@ -5,6 +5,7 @@
 #include "HaikuShm.h"
 #include "HaikuCompositor.h"
 #include "HaikuSubcompositor.h"
+#include "HaikuViewporter.h"
 #include "HaikuXdgShell.h"
 #include "HaikuXdgSurface.h"
 #include "HaikuXdgToplevel.h"
@@ -92,6 +93,7 @@ status_t WaylandServer::Init()
 	Assert(HaikuShmGlobal::Create(fDisplay) != NULL);
 	Assert(HaikuCompositorGlobal::Create(fDisplay) != NULL);
 	Assert(HaikuSubcompositorGlobal::Create(fDisplay) != NULL);
+	Assert(HaikuViewporterGlobal::Create(fDisplay) != NULL);
 	Assert(HaikuOutputGlobal::Create(fDisplay) != NULL);
 	Assert(HaikuDataDeviceManagerGlobal::Create(fDisplay) != NULL);
 	Assert((fSeatGlobal = HaikuSeatGlobal::Create(fDisplay)) != NULL);

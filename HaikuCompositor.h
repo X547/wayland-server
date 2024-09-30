@@ -63,7 +63,26 @@ private:
 			fieldScale,
 			fieldOpaqueRgn,
 			fieldInputRgn,
-			fieldFrameCallbacks
+			fieldFrameCallbacks,
+			fieldViewport
+	};
+
+	struct ViewportSrc {
+			float x = -1, y = -1, width = -1, height = -1;
+
+			inline bool IsValid() const
+			{
+				return x != -1 && y != -1 && width != -1 && height != -1;
+			}
+	};
+
+	struct ViewportDst {
+			int32_t width = -1, height = -1;
+
+			inline bool IsValid() const
+			{
+				return width != -1 && height != -1;
+			}
 	};
 
 	struct State {
@@ -74,6 +93,8 @@ private:
 		std::optional<BRegion> opaqueRgn;
 		std::optional<BRegion> inputRgn;
 		FrameCallback::List frameCallbacks;
+		ViewportSrc viewportSrc;
+		ViewportDst viewportDst;
 	};
 
 	ObjectDeleter<Hook> fHook;
@@ -94,9 +115,10 @@ public:
 	static HaikuSurface *FromResource(struct wl_resource *resource) {return (HaikuSurface*)WlResource::FromResource(resource);}
 	virtual ~HaikuSurface();
 
-	BView *View() {return (BView*)fView;}
-	BBitmap *Bitmap() {return fState.buffer == NULL ? NULL : &fState.buffer->Bitmap();}
-	void GetOffset(int32_t &x, int32_t &y) {x = fState.dx; y = fState.dy;}
+	BView *View() const {return (BView*)fView;}
+	BBitmap *Bitmap() const {return fState.buffer == NULL ? NULL : &fState.buffer->Bitmap();}
+	void GetOffset(int32_t &x, int32_t &y) const {x = fState.dx; y = fState.dy;}
+	BSize Size() const;
 	HaikuXdgSurface *XdgSurface() {return fXdgSurface;}
 	HaikuSubsurface *Subsurface() {return fSubsurface;}
 	HaikuServerDecoration *ServerDecoration() {return fServerDecoration;}
@@ -108,6 +130,9 @@ public:
 	void CallFrameCallbacks();
 
 	void SetHook(Hook *hook);
+
+	void SetViewportSrc(float x, float y, float width, float height);
+	void SetViewportDst(int32_t width, int32_t height);
 
 	void HandleAttach(struct wl_resource *buffer_resource, int32_t dx, int32_t dy) override;
 	void HandleDamage(int32_t x, int32_t y, int32_t width, int32_t height) override;

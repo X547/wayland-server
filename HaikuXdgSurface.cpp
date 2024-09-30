@@ -83,7 +83,7 @@ void XdgSurfaceHook::HandleCommit()
 		}
 		if (fXdgSurface->Surface()->Bitmap() != NULL) {
 			BSize oldSize = fXdgSurface->Window()->Size();
-			BSize newSize = fXdgSurface->Surface()->Bitmap()->Bounds().Size();
+			BSize newSize = fXdgSurface->Surface()->Size();
 			if (oldSize != newSize) {
 				fXdgSurface->Window()->ResizeTo(newSize.width, newSize.height);
 			}

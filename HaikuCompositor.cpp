@@ -183,7 +183,16 @@ void WaylandView::Draw(BRect dirty)
 
 	BBitmap *bmp = fSurface->Bitmap();
 	if (bmp != NULL) {
-		AppKitPtrs::LockedPtr(this)->DrawBitmap(bmp);
+		auto lockedBitmap = AppKitPtrs::LockedPtr(this);
+		const auto &viewportSrc = fSurface->fState.viewportSrc;
+		const auto &viewportDst = fSurface->fState.viewportDst;
+		if (viewportSrc.IsValid() && viewportDst.IsValid()) {
+			BRect bitmapRect(viewportSrc.x, viewportSrc.y, viewportSrc.x + viewportSrc.width - 1, viewportSrc.y + viewportSrc.height - 1);
+			BRect viewRect(0, 0, viewportDst.width - 1, viewportDst.height - 1);
+			lockedBitmap->DrawBitmap(bmp, bitmapRect, viewRect);
+		} else {
+			lockedBitmap->DrawBitmap(bmp);
+		}
 	}
 
 	fSurface->CallFrameCallbacks();
@@ -217,6 +226,17 @@ HaikuSurface::~HaikuSurface()
 		seat->SetPointerFocus(this, false, BMessage());
 		seat->SetKeyboardFocus(this, false);
 	}
+}
+
+BSize HaikuSurface::Size() const
+{
+	if (fState.viewportDst.IsValid()) {
+		return BSize(fState.viewportDst.width - 1, fState.viewportDst.height - 1);
+	}
+	if (Bitmap() != NULL) {
+		return BSize(Bitmap()->Bounds().Width(), Bitmap()->Bounds().Height());
+	}
+	return BSize(-1, -1);
 }
 
 void HaikuSurface::AttachWindow(BWindow *window)
@@ -275,6 +295,18 @@ void HaikuSurface::SetHook(Hook *hook)
 	fHook.SetTo(hook);
 }
 
+
+void HaikuSurface::SetViewportSrc(float x, float y, float width, float height)
+{
+	fPendingState.viewportSrc = {x, y, width, height};
+	fPendingFields |= (1 << fieldViewport);
+}
+
+void HaikuSurface::SetViewportDst(int32_t width, int32_t height)
+{
+	fPendingState.viewportDst = {width, height};
+	fPendingFields |= (1 << fieldViewport);
+}
 
 void HaikuSurface::HandleAttach(struct wl_resource *buffer_resource, int32_t dx, int32_t dy)
 {
@@ -353,14 +385,17 @@ void HaikuSurface::HandleCommit()
 			case fieldFrameCallbacks:
 				fState.frameCallbacks.MoveFrom(&fPendingState.frameCallbacks);
 				break;
+			case fieldViewport:
+				fState.viewportSrc = fPendingState.viewportSrc;
+				fState.viewportDst = fPendingState.viewportDst;
+				break;
 		}
 	}
 
 	if (View() != NULL) {
 		auto viewLocked = AppKitPtrs::LockedPtr(View());
-		if (Bitmap() != NULL) {
-			viewLocked->ResizeTo(Bitmap()->Bounds().Width(), Bitmap()->Bounds().Height());
-		}
+		BSize size = Size();
+		viewLocked->ResizeTo(size.width, size.height);
 		Invalidate();
 	}
 	if (fHook.IsSet()) {
