@@ -202,6 +202,7 @@ void HaikuPointer::HandleSetCursor(uint32_t serial, struct wl_resource *_surface
 		SurfaceCursorHook *hook = new SurfaceCursorHook();
 		hook->fHotspot = BPoint(hotspot_x, hotspot_y);
 		surface->SetHook(hook);
+		hook->HandleCommit();
 	}
 }
 
