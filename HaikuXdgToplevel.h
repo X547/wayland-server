@@ -27,7 +27,6 @@ private:
 		struct {
 			uint32_t maximized: 1;
 			uint32_t fullscreen: 1;
-			uint32_t resizing: 1;
 			uint32_t activated: 1;
 		};
 		uint32_t val;

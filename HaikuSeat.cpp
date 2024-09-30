@@ -583,7 +583,14 @@ bool HaikuSeatGlobal::MessageReceived(HaikuSurface *surface, BMessage *msg)
 							if (!xdgSurface->SetConfigurePending()) true;
 
 							fPointerFocus->View()->Window()->MoveBy(where.x - fTrack.origin.x, where.y - fTrack.origin.y);
-							struct wl_array array{};
+
+							uint32_t arrayData[] = {XdgToplevel::stateResizing};
+							struct wl_array array {
+								.size = sizeof(arrayData),
+								.alloc = sizeof(arrayData),
+								.data = &arrayData
+							};
+
 							xdgSurface->Toplevel()->SendConfigure(fTrack.wndWidth - (where.x - fTrack.origin.x), fTrack.wndHeight - (where.y - fTrack.origin.y), &array);
 							fTrack.wndWidth -= where.x - fTrack.origin.x;
 							fTrack.wndHeight -= where.y - fTrack.origin.y;
@@ -603,7 +610,14 @@ bool HaikuSeatGlobal::MessageReceived(HaikuSurface *surface, BMessage *msg)
 							if (maxHeight == 0) maxHeight = INT32_MAX;
 							int32_t newWidth = std::min<int32_t>(std::max<int32_t>(fTrack.wndWidth + (where.x - fTrack.origin.x), minWidth), maxWidth);
 							int32_t newHeight = std::min<int32_t>(std::max<int32_t>(fTrack.wndHeight + (where.y - fTrack.origin.y), minHeight), maxHeight);
-							struct wl_array array{};
+
+							uint32_t arrayData[] = {XdgToplevel::stateResizing};
+							struct wl_array array {
+								.size = sizeof(arrayData),
+								.alloc = sizeof(arrayData),
+								.data = &arrayData
+							};
+
 							xdgSurface->Toplevel()->SendConfigure(newWidth, newHeight, &array);
 							xdgSurface->SendConfigure(xdgSurface->NextSerial());
 						}
