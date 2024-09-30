@@ -3,6 +3,7 @@
 #include "HaikuShm.h"
 #include "HaikuCompositor.h"
 #include "HaikuSubcompositor.h"
+#include "HaikuViewporter.h"
 #include "HaikuXdgShell.h"
 #include "HaikuXdgSurface.h"
 #include "HaikuXdgToplevel.h"
@@ -129,6 +130,7 @@ extern "C" _EXPORT int wl_ips_client_connected(void **clientOut, void *clientDis
 		Assert(HaikuShmGlobal::Create(sDisplay) != NULL);
 		Assert(HaikuCompositorGlobal::Create(sDisplay) != NULL);
 		Assert(HaikuSubcompositorGlobal::Create(sDisplay) != NULL);
+		Assert(HaikuViewporterGlobal::Create(sDisplay) != NULL);
 		Assert(HaikuOutputGlobal::Create(sDisplay) != NULL);
 		Assert(HaikuDataDeviceManagerGlobal::Create(sDisplay) != NULL);
 		Assert((seat = HaikuSeatGlobal::Create(sDisplay)) != NULL);

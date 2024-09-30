@@ -233,7 +233,15 @@ void WaylandView::Draw(BRect dirty)
 			viewLocked->ConstrainClippingRegion(&remaining);
 		}
 		viewLocked->SetDrawingMode(mode);
-		viewLocked->DrawBitmap(bmp);
+		const auto &viewportSrc = fSurface->fState.viewportSrc;
+		const auto &viewportDst = fSurface->fState.viewportDst;
+		if (viewportSrc.IsValid() && viewportDst.IsValid()) {
+			BRect bitmapRect(viewportSrc.x, viewportSrc.y, viewportSrc.x + viewportSrc.width - 1, viewportSrc.y + viewportSrc.height - 1);
+			BRect viewRect(0, 0, viewportDst.width - 1, viewportDst.height - 1);
+			viewLocked->DrawBitmap(bmp, bitmapRect, viewRect);
+		} else {
+			viewLocked->DrawBitmap(bmp);
+		}
 	}
 
 	fSurface->CallFrameCallbacks();
@@ -275,6 +283,17 @@ HaikuSurface::~HaikuSurface()
 	for (HaikuSubsurface *subsurface = SurfaceList().First(); subsurface != NULL; subsurface = SurfaceList().GetNext(subsurface)) {
 		subsurface->fParent = NULL;
 	}
+}
+
+BSize HaikuSurface::Size() const
+{
+	if (fState.viewportDst.IsValid()) {
+		return BSize(fState.viewportDst.width - 1, fState.viewportDst.height - 1);
+	}
+	if (Bitmap() != NULL) {
+		return BSize(Bitmap()->Bounds().Width(), Bitmap()->Bounds().Height());
+	}
+	return BSize(-1, -1);
 }
 
 void HaikuSurface::AttachWindow(BWindow *window)
@@ -356,6 +375,18 @@ void HaikuSurface::SetHook(Hook *hook)
 }
 
 
+void HaikuSurface::SetViewportSrc(float x, float y, float width, float height)
+{
+	fPendingState.viewportSrc = {x, y, width, height};
+	fPendingFields |= (1 << fieldViewport);
+}
+
+void HaikuSurface::SetViewportDst(int32_t width, int32_t height)
+{
+	fPendingState.viewportDst = {width, height};
+	fPendingFields |= (1 << fieldViewport);
+}
+
 void HaikuSurface::HandleAttach(struct wl_resource *buffer_resource, int32_t dx, int32_t dy)
 {
 	fPendingState.buffer = HaikuShmBuffer::FromResource(buffer_resource);
@@ -433,6 +464,10 @@ void HaikuSurface::HandleCommit()
 			case fieldFrameCallbacks:
 				fState.frameCallbacks.TakeFrom(&fPendingState.frameCallbacks);
 				break;
+			case fieldViewport:
+				fState.viewportSrc = fPendingState.viewportSrc;
+				fState.viewportDst = fPendingState.viewportDst;
+				break;
 		}
 	}
 
@@ -441,9 +476,8 @@ void HaikuSurface::HandleCommit()
 		if (fSubsurface != NULL) {
 			viewLocked->MoveTo(fSubsurface->GetState().x, fSubsurface->GetState().y);
 		}
-		if (Bitmap() != NULL) {
-			viewLocked->ResizeTo(Bitmap()->Bounds().Width(), Bitmap()->Bounds().Height());
-		}
+		BSize size = Size();
+		viewLocked->ResizeTo(size.width, size.height);
 		Invalidate();
 	}
 	if (fHook.IsSet()) {
