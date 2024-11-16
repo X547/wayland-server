@@ -22,11 +22,11 @@ void SubsurfaceHook::HandleCommit()
 {
 	HaikuSurface *surf = Base();
 	HaikuSubsurface *subsurf = surf->Subsurface();
-	AppKitPtrs::LockedPtr(surf->View())->MoveTo(subsurf->GetState().x, subsurf->GetState().y);
 
 	BBitmap *bitmap = Base()->Bitmap();
 	if (Base()->View() != NULL) {
 		auto viewLocked = AppKitPtrs::LockedPtr(Base()->View());
+		viewLocked->MoveTo(subsurf->GetState().x, subsurf->GetState().y);
 		if (bitmap != NULL) {
 			viewLocked->ResizeTo(bitmap->Bounds().Width(), bitmap->Bounds().Height());
 		}
