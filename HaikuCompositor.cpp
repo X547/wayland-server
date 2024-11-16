@@ -251,7 +251,12 @@ void HaikuSurface::Invalidate()
 	if (fView == NULL) {
 		return;
 	}
-	AppKitPtrs::LockedPtr(fView)->Invalidate(&fDirty);
+	auto viewLocked = AppKitPtrs::LockedPtr(fView);
+	if (fSubsurface != NULL) {
+		viewLocked->Invalidate();
+	} else {
+		viewLocked->Invalidate(&fDirty);
+	}
 	fDirty.MakeEmpty();
 }
 
