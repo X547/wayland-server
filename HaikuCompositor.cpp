@@ -164,9 +164,22 @@ void WaylandView::MessageReceived(BMessage *msg)
 	{
 		WaylandEnv wlEnv(this);
 		HaikuSeatGlobal *seat = HaikuGetSeat(fSurface->Client());
-
-		if (seat != NULL && seat->MessageReceived(fSurface, msg)) {
-			return;
+		if (seat != NULL) {
+			bool isPointerMessage = true;
+			BPoint where;
+			if (msg->WasDropped()) {
+				where = msg->DropPoint();
+				AppKitPtrs::LockedPtr(this)->ConvertFromScreen(&where);
+			} else if (msg->FindPoint("be:view_where", &where) < B_OK) {
+				isPointerMessage = false;
+			}
+			HaikuSurface *surface = fSurface;
+			while (isPointerMessage && !surface->InputRgnContains(where) && surface->Subsurface() != NULL) {
+				surface = surface->Subsurface()->Parent();
+			}
+			if (seat->MessageReceived(surface, msg)) {
+				return;
+			}
 		}
 	}
 	BView::MessageReceived(msg);
