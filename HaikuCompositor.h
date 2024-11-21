@@ -96,6 +96,7 @@ public:
 
 	BView *View() {return (BView*)fView;}
 	BBitmap *Bitmap() {return fState.buffer == NULL ? NULL : &fState.buffer->Bitmap();}
+	bool InputRgnContains(BPoint p) {return !fState.inputRgn ? true : fState.inputRgn->Contains(p);}
 	void GetOffset(int32_t &x, int32_t &y) {x = fState.dx; y = fState.dy;}
 	HaikuXdgSurface *XdgSurface() {return fXdgSurface;}
 	HaikuSubsurface *Subsurface() {return fSubsurface;}
