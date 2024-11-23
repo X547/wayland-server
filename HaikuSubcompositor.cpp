@@ -81,12 +81,18 @@ HaikuSubsurface *HaikuSubsurface::Create(struct wl_client *client, uint32_t vers
 	if (!subsurface->Init(client, version, id)) {
 		return NULL;
 	}
-	subsurface->fSurface = HaikuSurface::FromResource(surface);
-	subsurface->fSurface->fSubsurface = subsurface;
+	HaikuSurface *haikuSurface = HaikuSurface::FromResource(surface);
+	subsurface->fSurface = haikuSurface;
+	haikuSurface->fSubsurface = subsurface;
 	subsurface->fParent = HaikuSurface::FromResource(parent);
 	subsurface->fParent->SurfaceList().Insert(subsurface);
-	subsurface->fSurface->SetHook(new SubsurfaceHook());
-	subsurface->fSurface->AttachView(subsurface->fParent->View());
+	haikuSurface->SetHook(new SubsurfaceHook());
+	
+	BView *parentView = subsurface->fParent->View();
+	if (parentView) {
+		haikuSurface->AttachView(parentView);
+		haikuSurface->AttachViewsToEarlierSubsurfaces();
+	}
 	return subsurface;
 }
 
