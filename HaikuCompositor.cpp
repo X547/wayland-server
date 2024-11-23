@@ -244,6 +244,17 @@ void HaikuSurface::AttachView(BView *view)
 	view->AddChild(fView);
 }
 
+void HaikuSurface::AttachViewsToEarlierSubsurfaces()
+{
+	if (fView == NULL) {
+		fprintf(stderr, "[!] HaikuSurface::AttachViewsToEarlierSubsurfaces(): fView == NULL\n");
+		return;
+	}
+	for (HaikuSubsurface *subsurface = SurfaceList().First(); subsurface != NULL; subsurface = SurfaceList().GetNext(subsurface)) {
+		subsurface->Surface()->AttachView(fView);
+	}
+}
+
 void HaikuSurface::Detach()
 {
 	if (fView == NULL) {
