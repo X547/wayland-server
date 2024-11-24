@@ -104,6 +104,7 @@ public:
 	HaikuSubsurface::SurfaceList &SurfaceList() {return fSurfaceList;}
 	void AttachWindow(BWindow *window);
 	void AttachView(BView *view);
+	void AttachViewsToEarlierSubsurfaces();
 	void Detach();
 	void Invalidate();
 	void CallFrameCallbacks();
