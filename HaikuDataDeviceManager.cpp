@@ -102,7 +102,7 @@ BMessage *HaikuDataSource::ToMessage()
 		}
 		std::vector<uint8> data;
 		ReadData(data, mimeType.c_str());
-		msg->AddData(mimeType.c_str(), B_MIME_TYPE, &data[0], data.size());
+		msg->AddData(mimeType.c_str(), B_MIME_TYPE, data.data(), data.size());
 	}
 	ObjectDeleter<BMessage> dstMsg(new BMessage(B_SIMPLE_DATA));
 	ConvertToHaikuMessage(*dstMsg.Get(), *msg.Get());
