@@ -20,7 +20,6 @@
 
 #include <Application.h>
 #include <OS.h>
-#include "AppKitPtrs.h"
 
 
 static void Assert(bool cond) {if (!cond) abort();}
@@ -117,7 +116,9 @@ extern "C" _EXPORT int wl_ips_client_connected(void **clientOut, void *clientDis
 		be_app->Run();
 	}
 	if (gServerHandler.Looper() == NULL) {
-		AppKitPtrs::LockedPtr(be_app)->AddHandler(&gServerHandler);
+		be_app->LockLooper();
+		be_app->AddHandler(&gServerHandler);
+		be_app->UnlockLooper();
 		gServerMessenger.SetTo(&gServerHandler);
 	}
 

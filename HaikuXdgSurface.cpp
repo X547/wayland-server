@@ -4,11 +4,11 @@
 #include "HaikuXdgPopup.h"
 #include "HaikuCompositor.h"
 #include "HaikuServerDecoration.h"
+#include "WaylandEnv.h"
 #include <wayland-server-core.h>
 #include <wayland-server-protocol.h>
 #include <xdg-shell-protocol.h>
 
-#include "AppKitPtrs.h"
 #include <View.h>
 #include <Window.h>
 #include <Bitmap.h>
@@ -36,7 +36,8 @@ void XdgSurfaceHook::HandleCommit()
 	if (fXdgSurface->HasServerDecoration()) {
 		// toplevel: window size limits
 		if (fXdgSurface->fToplevel != NULL && fXdgSurface->fToplevel->fSizeLimitsDirty) {
-			fXdgSurface->Window()->SetSizeLimits(
+			WaylandHandlerLocker windowLocked(fXdgSurface->Window());
+			windowLocked->SetSizeLimits(
 				fXdgSurface->fToplevel->fMinWidth  == 0 ? 0     : fXdgSurface->fToplevel->fMinWidth  - 1,
 				fXdgSurface->fToplevel->fMaxWidth  == 0 ? 32768 : fXdgSurface->fToplevel->fMaxWidth  - 1,
 				fXdgSurface->fToplevel->fMinHeight == 0 ? 0     : fXdgSurface->fToplevel->fMinHeight - 1,
@@ -46,9 +47,9 @@ void XdgSurfaceHook::HandleCommit()
 				fXdgSurface->fToplevel->fMinWidth != 0 && fXdgSurface->fToplevel->fMinWidth == fXdgSurface->fToplevel->fMaxWidth &&
 				fXdgSurface->fToplevel->fMinHeight != 0 && fXdgSurface->fToplevel->fMinHeight == fXdgSurface->fToplevel->fMaxHeight
 			) {
-				fXdgSurface->Window()->SetFlags(fXdgSurface->Window()->Flags() | B_NOT_RESIZABLE);
+				windowLocked->SetFlags(windowLocked->Flags() | B_NOT_RESIZABLE);
 			} else {
-				fXdgSurface->Window()->SetFlags(fXdgSurface->Window()->Flags() & ~B_NOT_RESIZABLE);
+				windowLocked->SetFlags(windowLocked->Flags() & ~B_NOT_RESIZABLE);
 			}
 			fXdgSurface->fToplevel->fSizeLimitsDirty = false;
 		}
@@ -59,7 +60,7 @@ void XdgSurfaceHook::HandleCommit()
 			BSize newSize = oldSize;
 
 			if (fXdgSurface->Surface()->View() != NULL)
-				AppKitPtrs::LockedPtr(fXdgSurface->Surface()->View())->MoveTo(-fXdgSurface->fPendingGeometry.x, -fXdgSurface->fPendingGeometry.y);
+				WaylandHandlerLocker(fXdgSurface->Surface()->View())->MoveTo(-fXdgSurface->fPendingGeometry.x, -fXdgSurface->fPendingGeometry.y);
 			newSize.width = fXdgSurface->fPendingGeometry.width - 1;
 			newSize.height = fXdgSurface->fPendingGeometry.height - 1;
 
@@ -68,7 +69,7 @@ void XdgSurfaceHook::HandleCommit()
 				fXdgSurface->fToplevel->fWidth = (int32_t)newSize.width + 1;
 				fXdgSurface->fToplevel->fHeight = (int32_t)newSize.height + 1;
 
-				fXdgSurface->Window()->ResizeTo(newSize.width, newSize.height);
+				WaylandHandlerLocker(fXdgSurface->Window())->ResizeTo(newSize.width, newSize.height);
 			}
 		}
 	} else {
@@ -82,10 +83,11 @@ void XdgSurfaceHook::HandleCommit()
 			);
 		}
 		if (fXdgSurface->Surface()->Bitmap() != NULL) {
-			BSize oldSize = fXdgSurface->Window()->Size();
+			WaylandHandlerLocker windowLocked(fXdgSurface->Window());
+			BSize oldSize = windowLocked->Size();
 			BSize newSize = fXdgSurface->Surface()->Bitmap()->Bounds().Size();
 			if (oldSize != newSize) {
-				fXdgSurface->Window()->ResizeTo(newSize.width, newSize.height);
+				windowLocked->ResizeTo(newSize.width, newSize.height);
 			}
 		}
 	}
@@ -93,13 +95,14 @@ void XdgSurfaceHook::HandleCommit()
 
 	// initial window show
 	if (!fXdgSurface->fSurfaceInitalized && fXdgSurface->Surface()->Bitmap() != NULL) {
+		WaylandHandlerLocker windowLocked(fXdgSurface->Window());
 		if (fXdgSurface->Surface()->ServerDecoration() != NULL) {
-			fXdgSurface->Window()->SetLook(fXdgSurface->Surface()->ServerDecoration()->Look());
+			windowLocked->SetLook(fXdgSurface->Surface()->ServerDecoration()->Look());
 		}
 		if (fXdgSurface->fToplevel != NULL) {
-			fXdgSurface->Window()->CenterOnScreen();
+			windowLocked->CenterOnScreen();
 		}
-		fXdgSurface->Window()->Show();
+		windowLocked->Show();
 		fXdgSurface->fSurfaceInitalized = true;
 	}
 
@@ -108,7 +111,7 @@ void XdgSurfaceHook::HandleCommit()
 		if (fXdgSurface->Geometry().valid && !fXdgSurface->HasServerDecoration())
 			wndRect.OffsetBy(-fXdgSurface->Geometry().x, -fXdgSurface->Geometry().y);
 		fXdgSurface->fPopup->fParent->ConvertToScreen(wndRect);
-		fXdgSurface->Window()->MoveTo(wndRect.left, wndRect.top);
+		WaylandHandlerLocker(fXdgSurface->Window())->MoveTo(wndRect.left, wndRect.top);
 	}
 
 	// initial configure

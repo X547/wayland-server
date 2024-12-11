@@ -12,7 +12,6 @@
 #include <stdio.h>
 #include <bit>
 
-#include "AppKitPtrs.h"
 #include <Application.h>
 #include <View.h>
 #include <Window.h>
@@ -168,7 +167,7 @@ void WaylandView::MessageReceived(BMessage *msg)
 			BPoint where;
 			if (msg->WasDropped()) {
 				where = msg->DropPoint();
-				AppKitPtrs::LockedPtr(this)->ConvertFromScreen(&where);
+				ConvertFromScreen(&where);
 			} else if (msg->FindPoint("be:view_where", &where) < B_OK) {
 				isPointerMessage = false;
 			}
@@ -190,7 +189,6 @@ void WaylandView::Draw(BRect dirty)
 
 	BBitmap *bmp = fSurface->Bitmap();
 	if (bmp != NULL) {
-		auto viewLocked = AppKitPtrs::LockedPtr(this);
 		drawing_mode mode;
 		switch (bmp->ColorSpace()) {
 			case B_RGBA64:
@@ -206,15 +204,15 @@ void WaylandView::Draw(BRect dirty)
 				break;
 		}
 		if (mode == B_OP_ALPHA && fSurface->fState.opaqueRgn.has_value()) {
-			viewLocked->ConstrainClippingRegion(&fSurface->fState.opaqueRgn.value());
-			viewLocked->SetDrawingMode(B_OP_COPY);
-			viewLocked->DrawBitmap(bmp);
-			BRegion remaining = viewLocked->Bounds();
+			ConstrainClippingRegion(&fSurface->fState.opaqueRgn.value());
+			SetDrawingMode(B_OP_COPY);
+			DrawBitmap(bmp);
+			BRegion remaining = Bounds();
 			remaining.Exclude(&fSurface->fState.opaqueRgn.value());
-			viewLocked->ConstrainClippingRegion(&remaining);
+			ConstrainClippingRegion(&remaining);
 		}
-		viewLocked->SetDrawingMode(mode);
-		viewLocked->DrawBitmap(bmp);
+		SetDrawingMode(mode);
+		DrawBitmap(bmp);
 	}
 
 	fSurface->CallFrameCallbacks();
@@ -263,8 +261,11 @@ void HaikuSurface::AttachView(BView *view)
 		fprintf(stderr, "[!] HaikuSurface::AttachView(): view == NULL\n");
 		return;
 	}
+	if (fView != NULL)
+		debugger("[!] View already exists");
+
 	fView = new WaylandView(this);
-	view->AddChild(fView);
+	WaylandHandlerLocker(view)->AddChild(fView);
 }
 
 void HaikuSurface::AttachViewsToEarlierSubsurfaces()
@@ -283,9 +284,11 @@ void HaikuSurface::Detach()
 	if (fView == NULL) {
 		return;
 	}
-	fView->LockLooper();
-	BLooper *looper = fView->Looper();
-	fView->RemoveSelf();
+
+	WaylandHandlerLocker viewLocked(fView);
+	BLooper *looper = viewLocked->Looper();
+	viewLocked->RemoveSelf();
+	viewLocked.Detach();
 	if (looper != NULL) {
 		looper->Unlock();
 	}
@@ -298,7 +301,7 @@ void HaikuSurface::Invalidate()
 	if (fView == NULL) {
 		return;
 	}
-	auto viewLocked = AppKitPtrs::LockedPtr(fView);
+	auto viewLocked = WaylandHandlerLocker(fView);
 	if (fSubsurface != NULL) {
 		viewLocked->Invalidate();
 	} else {
@@ -404,7 +407,7 @@ void HaikuSurface::HandleCommit()
 	}
 
 	if (View() != NULL) {
-		auto viewLocked = AppKitPtrs::LockedPtr(View());
+		auto viewLocked = WaylandHandlerLocker(View());
 		if (fSubsurface != NULL) {
 			viewLocked->MoveTo(fSubsurface->GetState().x, fSubsurface->GetState().y);
 		}

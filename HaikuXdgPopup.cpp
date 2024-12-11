@@ -3,8 +3,6 @@
 #include "HaikuXdgPositioner.h"
 #include "WaylandEnv.h"
 
-#include "AppKitPtrs.h"
-
 #include <Window.h>
 #include <Screen.h>
 

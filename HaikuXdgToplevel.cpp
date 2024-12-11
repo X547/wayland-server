@@ -9,8 +9,6 @@
 #include <wayland-server-protocol.h>
 #include <xdg-shell-protocol.h>
 
-#include "AppKitPtrs.h"
-
 #include <Window.h>
 #include <Screen.h>
 
@@ -136,7 +134,7 @@ void HaikuXdgToplevel::HandleSetParent(struct wl_resource *_parent)
 
 void HaikuXdgToplevel::HandleSetTitle(const char *title)
 {
-	fWindow->SetTitle(title);
+	WaylandHandlerLocker(fWindow)->SetTitle(title);
 }
 
 void HaikuXdgToplevel::HandleSetAppId(const char *app_id)

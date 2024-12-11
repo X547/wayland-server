@@ -1,7 +1,7 @@
 #include "HaikuDataDeviceManager.h"
 #include "HaikuSeat.h"
+#include "WaylandEnv.h"
 #include "WaylandServer.h"
-#include "AppKitPtrs.h"
 #include <Screen.h>
 #include <Clipboard.h>
 #include <AutoLocker.h>
@@ -226,7 +226,10 @@ HaikuDataDevice *HaikuDataDevice::Create(struct wl_client *client, uint32_t vers
 	dataDevice->fSeat = HaikuSeat::FromResource(seat);
 	dataDevice->fSeat->GetGlobal()->fDataDevice = dataDevice;
 
-	AppKitPtrs::LockedPtr(&gServerHandler)->Looper()->AddHandler(&dataDevice->fClipboardWatcher);
+	{
+		WaylandEnv wlEnv(NULL);
+		gServerHandler.Looper()->AddHandler(&dataDevice->fClipboardWatcher);
+	}
 	be_clipboard->StartWatching(BMessenger(&dataDevice->fClipboardWatcher));
 
 	return dataDevice;
@@ -235,7 +238,10 @@ HaikuDataDevice *HaikuDataDevice::Create(struct wl_client *client, uint32_t vers
 HaikuDataDevice::~HaikuDataDevice()
 {
 	be_clipboard->StopWatching(BMessenger(&fClipboardWatcher));
-	AppKitPtrs::LockedPtr(&gServerHandler)->Looper()->RemoveHandler(&fClipboardWatcher);
+	{
+		WaylandEnv wlEnv(NULL);
+		gServerHandler.Looper()->RemoveHandler(&fClipboardWatcher);
+	}
 }
 
 void HaikuDataDevice::HandleStartDrag(struct wl_resource *_source, struct wl_resource *_origin, struct wl_resource *_icon, uint32_t serial)
