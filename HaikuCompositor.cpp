@@ -134,7 +134,6 @@ WaylandView::WaylandView(HaikuSurface *surface):
 	BView(BRect(), "WaylandView", B_FOLLOW_NONE, B_WILL_DRAW | B_TRANSPARENT_BACKGROUND),
 	fSurface(surface)
 {
-	SetDrawingMode(B_OP_ALPHA);
 	SetViewColor(B_TRANSPARENT_COLOR);
 }
 
@@ -187,13 +186,19 @@ void WaylandView::MessageReceived(BMessage *msg)
 
 void WaylandView::Draw(BRect dirty)
 {
-	WaylandEnv wlEnv(this);
-
 	BBitmap *bmp = fSurface->Bitmap();
 	if (bmp != NULL) {
-		AppKitPtrs::LockedPtr(this)->DrawBitmap(bmp);
+		drawing_mode mode = B_OP_ALPHA;
+		if (bmp->ColorSpace() == B_RGB32 || Parent() == NULL)
+			mode = B_OP_COPY;
+
+		SetDrawingMode(mode);
+		DrawBitmap(bmp);
 	}
 
+	// WaylandEnv unlocks our looper, which leaves us open to be deleted or detached,
+	// so we must do this after drawing.
+	WaylandEnv wlEnv(this);
 	fSurface->CallFrameCallbacks();
 }
 
@@ -345,6 +350,8 @@ void HaikuSurface::HandleCommit()
 {
 	//printf("HaikuSurface::HandleCommit()\n");
 
+	auto viewLocked = AppKitPtrs::LockedPtr(View());
+
 	for (;;) {
 		uint32 field = std::countr_zero(fPendingFields);
 		if (field >= 32) {
@@ -381,7 +388,9 @@ void HaikuSurface::HandleCommit()
 	}
 
 	if (View() != NULL) {
-		auto viewLocked = AppKitPtrs::LockedPtr(View());
+		if (fSubsurface != NULL) {
+			viewLocked->MoveTo(fSubsurface->GetState().x, fSubsurface->GetState().y);
+		}
 		if (Bitmap() != NULL) {
 			viewLocked->ResizeTo(Bitmap()->Bounds().Width(), Bitmap()->Bounds().Height());
 		}
