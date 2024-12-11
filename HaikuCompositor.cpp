@@ -382,6 +382,9 @@ void HaikuSurface::HandleCommit()
 
 	if (View() != NULL) {
 		auto viewLocked = AppKitPtrs::LockedPtr(View());
+		if (fSubsurface != NULL) {
+			viewLocked->MoveTo(fSubsurface->GetState().x, fSubsurface->GetState().y);
+		}
 		if (Bitmap() != NULL) {
 			viewLocked->ResizeTo(Bitmap()->Bounds().Width(), Bitmap()->Bounds().Height());
 		}

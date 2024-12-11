@@ -13,28 +13,6 @@ extern const struct wl_interface wl_subcompositor_interface;
 #define SUBCOMPOSITOR_VERSION 1
 
 
-class SubsurfaceHook: public HaikuSurface::Hook {
-public:
-	void HandleCommit() final;
-};
-
-void SubsurfaceHook::HandleCommit()
-{
-	HaikuSurface *surf = Base();
-	HaikuSubsurface *subsurf = surf->Subsurface();
-
-	BBitmap *bitmap = Base()->Bitmap();
-	if (Base()->View() != NULL) {
-		auto viewLocked = AppKitPtrs::LockedPtr(Base()->View());
-		viewLocked->MoveTo(subsurf->GetState().x, subsurf->GetState().y);
-		if (bitmap != NULL) {
-			viewLocked->ResizeTo(bitmap->Bounds().Width(), bitmap->Bounds().Height());
-		}
-		Base()->Invalidate();
-	}
-}
-
-
 //#pragma mark - HaikuSubcompositor
 
 class HaikuSubcompositor: public WlSubcompositor {
@@ -86,8 +64,7 @@ HaikuSubsurface *HaikuSubsurface::Create(struct wl_client *client, uint32_t vers
 	haikuSurface->fSubsurface = subsurface;
 	subsurface->fParent = HaikuSurface::FromResource(parent);
 	subsurface->fParent->SurfaceList().Insert(subsurface);
-	haikuSurface->SetHook(new SubsurfaceHook());
-	
+
 	BView *parentView = subsurface->fParent->View();
 	if (parentView) {
 		haikuSurface->AttachView(parentView);
