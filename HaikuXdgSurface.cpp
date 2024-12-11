@@ -4,11 +4,11 @@
 #include "HaikuXdgPopup.h"
 #include "HaikuCompositor.h"
 #include "HaikuServerDecoration.h"
+#include "WaylandEnv.h"
 #include <wayland-server-core.h>
 #include <wayland-server-protocol.h>
 #include <xdg-shell-protocol.h>
 
-#include "AppKitPtrs.h"
 #include <View.h>
 #include <Window.h>
 #include <Bitmap.h>
@@ -36,7 +36,8 @@ void XdgSurfaceHook::HandleCommit()
 	if (fXdgSurface->HasServerDecoration()) {
 		// toplevel: window size limits
 		if (fXdgSurface->fToplevel != NULL && fXdgSurface->fToplevel->fSizeLimitsDirty) {
-			fXdgSurface->Window()->SetSizeLimits(
+			WaylandHandlerLocker windowLocked(fXdgSurface->Window());
+			windowLocked->SetSizeLimits(
 				fXdgSurface->fToplevel->fMinWidth  == 0 ? 0     : fXdgSurface->fToplevel->fMinWidth  - 1,
 				fXdgSurface->fToplevel->fMaxWidth  == 0 ? 32768 : fXdgSurface->fToplevel->fMaxWidth  - 1,
 				fXdgSurface->fToplevel->fMinHeight == 0 ? 0     : fXdgSurface->fToplevel->fMinHeight - 1,
@@ -46,9 +47,9 @@ void XdgSurfaceHook::HandleCommit()
 				fXdgSurface->fToplevel->fMinWidth != 0 && fXdgSurface->fToplevel->fMinWidth == fXdgSurface->fToplevel->fMaxWidth &&
 				fXdgSurface->fToplevel->fMinHeight != 0 && fXdgSurface->fToplevel->fMinHeight == fXdgSurface->fToplevel->fMaxHeight
 			) {
-				fXdgSurface->Window()->SetFlags(fXdgSurface->Window()->Flags() | B_NOT_RESIZABLE);
+				windowLocked->SetFlags(windowLocked->Flags() | B_NOT_RESIZABLE);
 			} else {
-				fXdgSurface->Window()->SetFlags(fXdgSurface->Window()->Flags() & ~B_NOT_RESIZABLE);
+				windowLocked->SetFlags(windowLocked->Flags() & ~B_NOT_RESIZABLE);
 			}
 			fXdgSurface->fToplevel->fSizeLimitsDirty = false;
 		}
@@ -59,7 +60,7 @@ void XdgSurfaceHook::HandleCommit()
 			BSize newSize = oldSize;
 
 			if (fXdgSurface->Surface()->View() != NULL)
-				AppKitPtrs::LockedPtr(fXdgSurface->Surface()->View())->MoveTo(-fXdgSurface->fPendingGeometry.x, -fXdgSurface->fPendingGeometry.y);
+				WaylandHandlerLocker(fXdgSurface->Surface()->View())->MoveTo(-fXdgSurface->fPendingGeometry.x, -fXdgSurface->fPendingGeometry.y);
 			newSize.width = fXdgSurface->fPendingGeometry.width - 1;
 			newSize.height = fXdgSurface->fPendingGeometry.height - 1;
 

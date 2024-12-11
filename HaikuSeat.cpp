@@ -3,6 +3,7 @@
 #include "HaikuXdgSurface.h"
 #include "HaikuXdgToplevel.h"
 #include "HaikuDataDeviceManager.h"
+#include "WaylandEnv.h"
 #include "WaylandKeycodes.h"
 #include "XkbKeymap.h"
 #include <SupportDefs.h>
@@ -11,7 +12,6 @@
 #include <View.h>
 #include <Cursor.h>
 #include <Autolock.h>
-#include "AppKitPtrs.h"
 
 #include <stdio.h>
 #include <algorithm>
@@ -181,7 +181,7 @@ void SurfaceCursorHook::HandleCommit()
 	BBitmap *bitmap = Base()->Bitmap();
 	if (bitmap != NULL) {
 		BCursor cursor(bitmap, fHotspot);
-		AppKitPtrs::LockedPtr(be_app)->SetCursor(&cursor);
+		WaylandHandlerLocker(be_app)->SetCursor(&cursor);
 	} else {
 		be_app->SetCursor(B_CURSOR_SYSTEM_DEFAULT, true);
 	}
@@ -274,7 +274,7 @@ void HaikuSeatGlobal::SetPointerFocus(HaikuSurface *surface, const BMessage &msg
 		BPoint where;
 		if (msg.WasDropped()) {
 			where = msg.DropPoint();
-			AppKitPtrs::LockedPtr(fPointerFocus->View())->ConvertFromScreen(&where);
+			WaylandHandlerLocker(fPointerFocus->View())->ConvertFromScreen(&where);
 		} else if (msg.FindPoint("be:view_where", &where) < B_OK) where = B_ORIGIN;
 		switch (fTrack.id) {
 		case trackClient:
@@ -463,7 +463,7 @@ bool HaikuSeatGlobal::MessageReceived(HaikuSurface *surface, BMessage *msg)
 			if (oldBtns == 0 && btns != 0) {
 				fTrack.captured = true;
 				fTrack.origin = where;
-				AppKitPtrs::LockedPtr(surface->View())->SetMouseEventMask(B_POINTER_EVENTS);
+				WaylandHandlerLocker(surface->View())->SetMouseEventMask(B_POINTER_EVENTS);
 			}
 			fOldMouseBtns = btns;
 			switch (fTrack.id) {

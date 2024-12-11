@@ -1,7 +1,6 @@
 #include "HaikuSubcompositor.h"
 #include "HaikuCompositor.h"
 
-#include "AppKitPtrs.h"
 #include <View.h>
 #include <Bitmap.h>
 
