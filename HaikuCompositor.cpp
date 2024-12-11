@@ -114,8 +114,11 @@ void HaikuCompositor::HandleCreateRegion(uint32_t id)
 
 class WaylandView: public BView {
 private:
+	friend class HaikuSurface;
+
 	HaikuSurface *fSurface;
 	uint32 fOldMouseBtns = 0;
+	WaylandEnv *fActiveWlEnv {};
 
 public:
 	WaylandView(HaikuSurface *surface);
@@ -139,7 +142,7 @@ WaylandView::WaylandView(HaikuSurface *surface):
 
 void WaylandView::DetachedFromWindow()
 {
-	WaylandEnv wlEnv(this);
+	WaylandEnv wlEnv(this, &fActiveWlEnv);
 	if (fSurface != NULL) {
 		fSurface->fView = NULL;
 	}
@@ -147,7 +150,7 @@ void WaylandView::DetachedFromWindow()
 
 void WaylandView::WindowActivated(bool active)
 {
-	WaylandEnv wlEnv(this);
+	WaylandEnv wlEnv(this, &fActiveWlEnv);
 	HaikuSeatGlobal *seat = HaikuGetSeat(fSurface->Client());
 	if (seat == NULL) return;
 
@@ -161,7 +164,7 @@ void WaylandView::WindowActivated(bool active)
 void WaylandView::MessageReceived(BMessage *msg)
 {
 	{
-		WaylandEnv wlEnv(this);
+		WaylandEnv wlEnv(this, &fActiveWlEnv);
 		HaikuSeatGlobal *seat = HaikuGetSeat(fSurface->Client());
 		if (seat != NULL) {
 			bool isPointerMessage = true;
@@ -186,7 +189,7 @@ void WaylandView::MessageReceived(BMessage *msg)
 
 void WaylandView::Draw(BRect dirty)
 {
-	WaylandEnv wlEnv(this);
+	WaylandEnv wlEnv(this, &fActiveWlEnv);
 
 	BBitmap *bmp = fSurface->Bitmap();
 	if (bmp != NULL) {
@@ -284,13 +287,16 @@ void HaikuSurface::Detach()
 		return;
 	}
 	fView->LockLooper();
+	if (fView->fActiveWlEnv != NULL) {
+		fView->fActiveWlEnv->Wait();
+	}
 	BLooper *looper = fView->Looper();
 	fView->RemoveSelf();
 	if (looper != NULL) {
+		delete fView;
+		fView = NULL;
 		looper->Unlock();
 	}
-	delete fView;
-	fView = NULL;
 }
 
 void HaikuSurface::Invalidate()
