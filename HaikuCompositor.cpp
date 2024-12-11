@@ -284,13 +284,14 @@ void HaikuSurface::Detach()
 		return;
 	}
 	fView->LockLooper();
+	WaylandEnv::WaitActive();
 	BLooper *looper = fView->Looper();
 	fView->RemoveSelf();
 	if (looper != NULL) {
+		delete fView;
+		fView = NULL;
 		looper->Unlock();
 	}
-	delete fView;
-	fView = NULL;
 }
 
 void HaikuSurface::Invalidate()

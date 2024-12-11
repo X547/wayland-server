@@ -35,6 +35,7 @@ static struct wl_display *sDisplay;
 
 ServerHandler gServerHandler;
 BMessenger gServerMessenger;
+WaylandEnv *WaylandEnv::sActive = NULL;
 
 ServerHandler::ServerHandler(): BHandler("server")
 {}
