@@ -134,7 +134,6 @@ WaylandView::WaylandView(HaikuSurface *surface):
 	BView(BRect(), "WaylandView", B_FOLLOW_NONE, B_WILL_DRAW | B_TRANSPARENT_BACKGROUND),
 	fSurface(surface)
 {
-	SetDrawingMode(B_OP_ALPHA);
 	SetViewColor(B_TRANSPARENT_COLOR);
 }
 
@@ -191,7 +190,23 @@ void WaylandView::Draw(BRect dirty)
 
 	BBitmap *bmp = fSurface->Bitmap();
 	if (bmp != NULL) {
-		AppKitPtrs::LockedPtr(this)->DrawBitmap(bmp);
+		auto viewLocked = AppKitPtrs::LockedPtr(this);
+		drawing_mode mode;
+		switch (bmp->ColorSpace()) {
+			case B_RGBA64:
+			case B_RGBA32:
+			case B_RGBA15:
+			case B_RGBA64_BIG:
+			case B_RGBA32_BIG:
+			case B_RGBA15_BIG:
+				mode = B_OP_ALPHA;
+				break;
+			default:
+				mode = B_OP_COPY;
+				break;
+		}
+		viewLocked->SetDrawingMode(mode);
+		viewLocked->DrawBitmap(bmp);
 	}
 
 	fSurface->CallFrameCallbacks();
