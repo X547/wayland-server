@@ -234,6 +234,8 @@ HaikuXdgToplevel *HaikuXdgToplevel::Create(HaikuXdgSurface *xdgSurface, uint32_t
 
 HaikuXdgToplevel::~HaikuXdgToplevel()
 {
+	fXdgSurface->Surface()->Detach();
+
 	if (fWindow != NULL) {
 		fWindow->fToplevel = NULL;
 		fWindow->PostMessage(B_QUIT_REQUESTED);

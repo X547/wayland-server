@@ -114,16 +114,20 @@ void HaikuCompositor::HandleCreateRegion(uint32_t id)
 
 class WaylandView: public BView {
 private:
+	friend class HaikuSurface;
+
 	HaikuSurface *fSurface;
 	uint32 fOldMouseBtns = 0;
+	WaylandEnv *fActiveWlEnv {};
 
 public:
 	WaylandView(HaikuSurface *surface);
-	virtual ~WaylandView() = default;
+	virtual ~WaylandView();
 
 	HaikuSurface *Surface() {return fSurface;}
 
-	void DetachedFromWindow() final;
+	void RemoveDescendantsAndSelf();
+
 	void WindowActivated(bool active) final;
 	void MessageReceived(BMessage *msg) final;
 	void Draw(BRect dirty);
@@ -137,17 +141,28 @@ WaylandView::WaylandView(HaikuSurface *surface):
 	SetViewColor(B_TRANSPARENT_COLOR);
 }
 
-void WaylandView::DetachedFromWindow()
+WaylandView::~WaylandView()
 {
-	WaylandEnv wlEnv(this);
 	if (fSurface != NULL) {
-		fSurface->fView = NULL;
+		debugger("[!] ~WaylandView: bad deletion");
 	}
+}
+
+void WaylandView::RemoveDescendantsAndSelf()
+{
+	while (BView* child = ChildAt(0)) {
+		WaylandView* view = dynamic_cast<WaylandView*>(child);
+		view->RemoveDescendantsAndSelf();
+	}
+
+	if (fActiveWlEnv != NULL)
+		WaylandEnv::Wait(&fActiveWlEnv, Looper());
+	RemoveSelf();
 }
 
 void WaylandView::WindowActivated(bool active)
 {
-	WaylandEnv wlEnv(this);
+	WaylandEnv wlEnv(this, &fActiveWlEnv);
 	HaikuSeatGlobal *seat = HaikuGetSeat(fSurface->Client());
 	if (seat == NULL) return;
 
@@ -161,7 +176,7 @@ void WaylandView::WindowActivated(bool active)
 void WaylandView::MessageReceived(BMessage *msg)
 {
 	{
-		WaylandEnv wlEnv(this);
+		WaylandEnv wlEnv(this, &fActiveWlEnv);
 		HaikuSeatGlobal *seat = HaikuGetSeat(fSurface->Client());
 		if (seat != NULL) {
 			bool isPointerMessage = true;
@@ -186,7 +201,7 @@ void WaylandView::MessageReceived(BMessage *msg)
 
 void WaylandView::Draw(BRect dirty)
 {
-	WaylandEnv wlEnv(this);
+	WaylandEnv wlEnv(this, &fActiveWlEnv);
 
 	BBitmap *bmp = fSurface->Bitmap();
 	if (bmp != NULL) {
@@ -249,6 +264,10 @@ HaikuSurface::~HaikuSurface()
 		seat->SetKeyboardFocus(this, false);
 	}
 
+	if (fView != NULL) {
+		Detach();
+	}
+
 	for (HaikuSubsurface *subsurface = SurfaceList().First(); subsurface != NULL; subsurface = SurfaceList().GetNext(subsurface)) {
 		subsurface->fParent = NULL;
 	}
@@ -256,6 +275,8 @@ HaikuSurface::~HaikuSurface()
 
 void HaikuSurface::AttachWindow(BWindow *window)
 {
+	Assert(fView == NULL);
+
 	fView = new WaylandView(this);
 	window->AddChild(fView);
 	fView->MakeFocus();
@@ -287,14 +308,18 @@ void HaikuSurface::Detach()
 	if (fView == NULL) {
 		return;
 	}
+
 	fView->LockLooper();
 	BLooper *looper = fView->Looper();
-	fView->RemoveSelf();
+	fView->RemoveDescendantsAndSelf();
+
+	fView->fSurface = NULL;
+	delete fView;
+	fView = NULL;
+
 	if (looper != NULL) {
 		looper->Unlock();
 	}
-	delete fView;
-	fView = NULL;
 }
 
 void HaikuSurface::Invalidate()
