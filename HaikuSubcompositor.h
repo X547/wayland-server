@@ -26,6 +26,8 @@ public:
 	};
 
 private:
+	friend class HaikuSurface;
+
 	HaikuSurface *fSurface{};
 	HaikuSurface *fParent{};
 	State fState;

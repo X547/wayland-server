@@ -248,6 +248,10 @@ HaikuSurface::~HaikuSurface()
 		seat->SetPointerFocus(this, false, BMessage());
 		seat->SetKeyboardFocus(this, false);
 	}
+
+	for (HaikuSubsurface *subsurface = SurfaceList().First(); subsurface != NULL; subsurface = SurfaceList().GetNext(subsurface)) {
+		subsurface->fParent = NULL;
+	}
 }
 
 void HaikuSurface::AttachWindow(BWindow *window)
