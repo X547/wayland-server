@@ -76,7 +76,9 @@ HaikuSubsurface *HaikuSubsurface::Create(struct wl_client *client, uint32_t vers
 HaikuSubsurface::~HaikuSubsurface()
 {
 	fSurface->Detach();
-	fParent->SurfaceList().Remove(this);
+	if (fParent != NULL) {
+		fParent->SurfaceList().Remove(this);
+	}
 	fSurface->fSubsurface = NULL;
 }
 
