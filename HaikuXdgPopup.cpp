@@ -88,6 +88,8 @@ HaikuXdgPopup *HaikuXdgPopup::Create(HaikuXdgSurface *xdgSurface, uint32_t id, s
 
 HaikuXdgPopup::~HaikuXdgPopup()
 {
+	fXdgSurface->Surface()->Detach();
+
 	if (fWindow != NULL) {
 		fWindow->fPopup = NULL;
 		fWindow->PostMessage(B_QUIT_REQUESTED);
