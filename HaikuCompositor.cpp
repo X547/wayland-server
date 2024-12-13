@@ -407,7 +407,7 @@ void HaikuSurface::HandleCommit()
 		}
 	}
 
-	if (View() != NULL) {
+	if (View() != NULL && View()->Window() != NULL) {
 		auto viewLocked = AppKitPtrs::LockedPtr(View());
 		if (fSubsurface != NULL) {
 			viewLocked->MoveTo(fSubsurface->GetState().x, fSubsurface->GetState().y);
