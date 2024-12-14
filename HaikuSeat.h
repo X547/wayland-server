@@ -2,6 +2,7 @@
 #include "Wayland.h"
 #include "WlGlobal.h"
 #include "XdgShell.h"
+#include "HaikuTextInput.h"
 #include <SupportDefs.h>
 #include <Point.h>
 #include <Locker.h>
@@ -62,6 +63,8 @@ private:
 	friend class HaikuPointer;
 	friend class HaikuKeyboard;
 	friend class HaikuDataDevice;
+	friend class HaikuTextInputGlobal;
+	friend class HaikuTextInput;
 
 	struct Track {
 		TrackId id = trackNone;
@@ -75,6 +78,7 @@ private:
 	uint32_t fSerial = 1;
 	HaikuPointer::List fPointerIfaces{};
 	HaikuKeyboard::List fKeyboardIfaces{};
+	HaikuTextInputGlobal *fTextInput{};
 	HaikuDataDevice *fDataDevice{};
 	HaikuSurface *fPointerFocus{};
 	HaikuSurface *fKeyboardFocus{};
