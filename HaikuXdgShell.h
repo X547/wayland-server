@@ -2,7 +2,7 @@
 
 #include "XdgShell.h"
 #include "WlGlobal.h"
-#include <private/kernel/util/DoublyLinkedList.h>
+#include <util/DoublyLinkedList.h>
 
 struct HaikuXdgShell;
 

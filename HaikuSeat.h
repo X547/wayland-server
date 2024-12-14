@@ -5,7 +5,7 @@
 #include <SupportDefs.h>
 #include <Point.h>
 #include <Locker.h>
-#include <private/kernel/util/DoublyLinkedList.h>
+#include <util/DoublyLinkedList.h>
 
 
 class BMessage;

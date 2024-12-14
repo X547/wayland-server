@@ -427,7 +427,7 @@ void HaikuSurface::HandleCommit()
 				fState.inputRgn = std::move(fPendingState.inputRgn);
 				break;
 			case fieldFrameCallbacks:
-				fState.frameCallbacks.MoveFrom(&fPendingState.frameCallbacks);
+				fState.frameCallbacks.TakeFrom(&fPendingState.frameCallbacks);
 				break;
 		}
 	}
