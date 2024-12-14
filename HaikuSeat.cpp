@@ -309,6 +309,9 @@ void HaikuSeatGlobal::SetKeyboardFocus(HaikuSurface *surface, bool setFocus)
 	if (setFocus) {
 		if (fKeyboardFocus != surface) {
 			if (fKeyboardFocus != NULL) {
+				if (fTextInput != NULL) {
+					fTextInput->Leave(fKeyboardFocus);
+				}
 				for (HaikuKeyboard *keyboard = fKeyboardIfaces.First(); keyboard != NULL; keyboard = fKeyboardIfaces.GetNext(keyboard)) {
 					if (keyboard->Client() != fKeyboardFocus->Client()) continue;
 					keyboard->SendLeave(NextSerial(), fKeyboardFocus->ToResource());
@@ -320,8 +323,14 @@ void HaikuSeatGlobal::SetKeyboardFocus(HaikuSurface *surface, bool setFocus)
 				if (keyboard->Client() != surface->Client()) continue;
 				keyboard->SendEnter(NextSerial(), surface->ToResource(), &keys);
 			}
+			if (fTextInput != NULL) {
+				fTextInput->Enter(surface);
+			}
 		}
 	} else if (fKeyboardFocus == surface) {
+		if (fTextInput != NULL) {
+			fTextInput->Leave(surface);
+		}
 		for (HaikuKeyboard *keyboard = fKeyboardIfaces.First(); keyboard != NULL; keyboard = fKeyboardIfaces.GetNext(keyboard)) {
 			if (keyboard->Client() != fKeyboardFocus->Client()) continue;
 			keyboard->SendLeave(NextSerial(), fKeyboardFocus->ToResource());
@@ -585,6 +594,9 @@ bool HaikuSeatGlobal::MessageReceived(HaikuSurface *surface, BMessage *msg)
 			}
 			return true;
 		}
+	}
+	if (fTextInput != NULL && fTextInput->MessageReceived(surface, msg)) {
+		return true;
 	}
 	return false;
 }

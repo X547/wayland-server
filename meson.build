@@ -28,6 +28,7 @@ protocols = {
 	'presentation-time': wl_protocol_dir / 'stable/presentation-time/presentation-time.xml',
 	'viewporter': wl_protocol_dir / 'stable/viewporter/viewporter.xml',
 	'activation-v1': wl_protocol_dir / 'staging/xdg-activation/xdg-activation-v1.xml',
+	'text-input-unstable-v3': wl_protocol_dir / 'unstable/text-input/text-input-unstable-v3.xml',
 	'server-decoration': 'protocols/server-decoration.xml',
 }
 
@@ -71,6 +72,7 @@ protocols_cpp = {
 	'PresentationTime': wl_protocol_dir / 'stable/presentation-time/presentation-time.xml',
 	'Viewporter': wl_protocol_dir / 'stable/viewporter/viewporter.xml',
 	'XdgActivationV1': wl_protocol_dir / 'staging/xdg-activation/xdg-activation-v1.xml',
+	'TextInputUnstableV3': wl_protocol_dir / 'unstable/text-input/text-input-unstable-v3.xml',
 	'ServerDecoration': 'protocols/server-decoration.xml',
 }
 
@@ -109,6 +111,7 @@ shared_library('wayland-server-inproc',
 		'HaikuServerDecoration.cpp',
 		'HaikuOutput.cpp',
 		'HaikuSeat.cpp',
+		'HaikuTextInput.cpp',
 		'XkbKeymap.cpp',
 		'HaikuDataDeviceManager.cpp',
 		wl_files

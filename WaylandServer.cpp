@@ -9,6 +9,7 @@
 #include "HaikuOutput.h"
 #include "HaikuDataDeviceManager.h"
 #include "HaikuSeat.h"
+#include "HaikuTextInput.h"
 #include "HaikuServerDecoration.h"
 #include "WaylandEnv.h"
 
@@ -124,13 +125,16 @@ extern "C" _EXPORT int wl_ips_client_connected(void **clientOut, void *clientDis
 	fprintf(stderr, "wl_ips_client_connected\n");
 	if (sDisplay == NULL) {
 		sDisplay = wl_display_create();
+		
+		HaikuSeatGlobal *seat {};
 
 		Assert(HaikuShmGlobal::Create(sDisplay) != NULL);
 		Assert(HaikuCompositorGlobal::Create(sDisplay) != NULL);
 		Assert(HaikuSubcompositorGlobal::Create(sDisplay) != NULL);
 		Assert(HaikuOutputGlobal::Create(sDisplay) != NULL);
 		Assert(HaikuDataDeviceManagerGlobal::Create(sDisplay) != NULL);
-		Assert(HaikuSeatGlobal::Create(sDisplay) != NULL);
+		Assert((seat = HaikuSeatGlobal::Create(sDisplay)) != NULL);
+		Assert(HaikuTextInputGlobal::Create(sDisplay, seat) != NULL);
 		Assert(HaikuXdgShell::Create(sDisplay) != NULL);
 		Assert(HaikuServerDecorationManagerGlobal::Create(sDisplay) != NULL);
 	}

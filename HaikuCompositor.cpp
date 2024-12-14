@@ -135,7 +135,7 @@ public:
 
 
 WaylandView::WaylandView(HaikuSurface *surface):
-	BView(BRect(), "WaylandView", B_FOLLOW_NONE, B_WILL_DRAW | B_TRANSPARENT_BACKGROUND),
+	BView(BRect(), "WaylandView", B_FOLLOW_NONE, B_WILL_DRAW | B_TRANSPARENT_BACKGROUND | B_INPUT_METHOD_AWARE),
 	fSurface(surface)
 {
 	SetViewColor(B_TRANSPARENT_COLOR);
