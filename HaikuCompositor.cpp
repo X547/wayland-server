@@ -191,6 +191,10 @@ void WaylandView::MessageReceived(BMessage *msg)
 			while (isPointerMessage && !surface->InputRgnContains(where) && surface->Subsurface() != NULL) {
 				surface = surface->Subsurface()->Parent();
 			}
+			if (surface != fSurface) {
+				BPoint offset = AppKitPtrs::LockedPtr(fSurface->View())->Frame().LeftTop() - AppKitPtrs::LockedPtr(surface->View())->Frame().LeftTop();
+				msg->ReplacePoint("be:view_where", where + offset);
+			}
 			if (seat->MessageReceived(surface, msg)) {
 				return;
 			}
