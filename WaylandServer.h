@@ -16,5 +16,6 @@ public:
 	void MessageReceived(BMessage *msg) final;
 };
 
+
 extern ServerHandler gServerHandler;
 extern BMessenger gServerMessenger;

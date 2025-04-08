@@ -36,6 +36,8 @@ static struct wl_display *sDisplay;
 
 ServerHandler gServerHandler;
 BMessenger gServerMessenger;
+BLooper *gWaylandLooper;
+
 
 ServerHandler::ServerHandler(): BHandler("server")
 {}
@@ -70,7 +72,6 @@ public:
 	void AddClient(struct wl_client *client);
 
 	thread_id Run() override;
-	void Quit() override;
 	void MessageReceived(BMessage *msg) override;
 };
 
@@ -86,12 +87,6 @@ void Application::AddClient(struct wl_client *client)
 thread_id Application::Run()
 {
 	return BLooper::Run();
-}
-
-void Application::Quit()
-{
-	BApplication::Quit();
-	exit(0);
 }
 
 void Application::MessageReceived(BMessage *msg)
@@ -111,21 +106,24 @@ void Application::MessageReceived(BMessage *msg)
 
 //#pragma mark - entry points
 
+_EXPORT uint32 wl_ips_version = 2;
+
 extern "C" _EXPORT int wl_ips_client_connected(void **clientOut, void *clientDisplay, client_enqueue_proc display_enqueue)
 {
-	if (be_app == NULL) {
-		new Application();
-		be_app->Run();
-	}
 	if (gServerHandler.Looper() == NULL) {
-		AppKitPtrs::LockedPtr(be_app)->AddHandler(&gServerHandler);
+		gWaylandLooper = new BLooper("wayland", B_DISPLAY_PRIORITY);
+		gWaylandLooper->AddHandler(&gServerHandler);
 		gServerMessenger.SetTo(&gServerHandler);
+		gWaylandLooper->Run();
 	}
+
+	new Application();
+	be_app->Run();
 
 	fprintf(stderr, "wl_ips_client_connected\n");
 	if (sDisplay == NULL) {
 		sDisplay = wl_display_create();
-		
+
 		HaikuSeatGlobal *seat {};
 
 		Assert(HaikuShmGlobal::Create(sDisplay) != NULL);
@@ -151,6 +149,12 @@ extern "C" _EXPORT int wl_ips_client_connected(void **clientOut, void *clientDis
 	wl_display_destroy(display);
 */
 }
+
+extern "C" _EXPORT void wl_ips_client_disconnected(void *client)
+{
+	// TODO: implement
+}
+
 
 extern "C" _EXPORT int wl_ips_closure_send(void *clientIn, struct wl_closure *closure)
 {
