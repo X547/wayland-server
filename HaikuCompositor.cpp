@@ -11,6 +11,8 @@
 #include <wayland-server-protocol.h>
 #include <stdio.h>
 #include <bit>
+#include <cmath>
+#include <algorithm>
 
 #include "AppKitPtrs.h"
 #include <Application.h>
@@ -19,6 +21,7 @@
 #include <Bitmap.h>
 #include <Region.h>
 #include <Cursor.h>
+#include <Screen.h>
 
 extern const struct wl_interface wl_compositor_interface;
 
@@ -131,11 +134,12 @@ public:
 	void WindowActivated(bool active) final;
 	void MessageReceived(BMessage *msg) final;
 	void Draw(BRect dirty);
+	void Pulse(void);
 };
 
 
 WaylandView::WaylandView(HaikuSurface *surface):
-	BView(BRect(), "WaylandView", B_FOLLOW_NONE, B_WILL_DRAW | B_TRANSPARENT_BACKGROUND | B_INPUT_METHOD_AWARE),
+	BView(BRect(), "WaylandView", B_FOLLOW_NONE, B_WILL_DRAW | B_TRANSPARENT_BACKGROUND | B_INPUT_METHOD_AWARE | B_PULSE_NEEDED),
 	fSurface(surface)
 {
 	SetViewColor(B_TRANSPARENT_COLOR);
@@ -235,10 +239,13 @@ void WaylandView::Draw(BRect dirty)
 		viewLocked->SetDrawingMode(mode);
 		viewLocked->DrawBitmap(bmp);
 	}
-
-	fSurface->CallFrameCallbacks();
 }
 
+void WaylandView::Pulse(void)
+{
+	if (fSurface)
+		fSurface->CallFrameCallbacks();
+}
 
 //#pragma mark - HaikuSurface
 
@@ -277,12 +284,30 @@ HaikuSurface::~HaikuSurface()
 	}
 }
 
+float HaikuSurface::RefreshRate()
+{
+	BScreen scr(B_MAIN_SCREEN_ID);
+
+	display_mode mode;
+	if (scr.GetMode(&mode) != B_OK)
+		return 60.0f;
+
+    float rate = rint(10 * float(mode.timing.pixel_clock * 1000)
+                    / float(mode.timing.h_total * mode.timing.v_total)) / 10.0;
+
+    if (std::isnan(rate))
+        return 60.0f;
+
+    return std::clamp(rate, 25.0f, 144.0f);
+}
+
 void HaikuSurface::AttachWindow(BWindow *window)
 {
 	Assert(fView == NULL);
 
 	fView = new WaylandView(this);
 	window->AddChild(fView);
+	window->SetPulseRate(1000000 / RefreshRate());
 	fView->MakeFocus();
 }
 

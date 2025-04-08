@@ -89,6 +89,8 @@ private:
 
 	HaikuSubsurface::SurfaceList fSurfaceList;
 
+	float RefreshRate();
+
 public:
 	static HaikuSurface *Create(struct wl_client *client, uint32_t version, uint32_t id);
 	static HaikuSurface *FromResource(struct wl_resource *resource) {return (HaikuSurface*)WlResource::FromResource(resource);}
