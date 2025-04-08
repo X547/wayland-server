@@ -9,6 +9,10 @@
 #include <String.h>
 
 #include <string.h>
+#include <fcntl.h>
+#include <sys/select.h>
+
+#include <vector>
 
 extern const struct wl_interface wl_data_device_manager_interface;
 
@@ -71,27 +75,62 @@ HaikuDataSource::~HaikuDataSource()
 status_t HaikuDataSource::ReadData(std::vector<uint8> &data, const char *mimeType)
 {
 	int pipes[2];
-	pipe(pipes);
+	if (pipe(pipes) != 0) {
+		return B_ERROR;
+	}
+
 	FileDescriptorCloser readPipe(pipes[0]);
 	FileDescriptorCloser writePipe(pipes[1]);
-	fcntl(readPipe.Get(), F_SETFD, FD_CLOEXEC);
-	fcntl(writePipe.Get(), F_SETFD, FD_CLOEXEC);
+
+	if (fcntl(readPipe.Get(), F_SETFD, FD_CLOEXEC) == -1 ||
+		fcntl(writePipe.Get(), F_SETFD, FD_CLOEXEC) == -1) {
+		return B_ERROR;
+	}
+
+	int flags = fcntl(readPipe.Get(), F_GETFL, 0);
+	if (fcntl(readPipe.Get(), F_SETFL, flags | O_NONBLOCK) == -1) {
+		return B_ERROR;
+	}
+
 	SendSend(mimeType, writePipe.Get());
 	writePipe.Unset();
-	data.resize(0);
-	enum {
-		bufferSize = 1024,
-	};
+
+	data.clear();
+
+	constexpr size_t bufferSize = 512;
+	std::vector<uint8> buffer(bufferSize);
+
 	while (true) {
-		data.resize(data.size() + bufferSize);
-		size_t readLen = read(readPipe.Get(), &data[data.size() - bufferSize], bufferSize);
-		data.resize(data.size() + readLen - bufferSize);
-		if (readLen == 0) {
+		fd_set readSet;
+		FD_ZERO(&readSet);
+		FD_SET(readPipe.Get(), &readSet);
+
+		struct timeval timeout;
+		timeout.tv_sec = 0;
+		timeout.tv_usec = 500;
+
+		int ret = select(readPipe.Get() + 1, &readSet, nullptr, nullptr, &timeout);
+		if (ret > 0 && FD_ISSET(readPipe.Get(), &readSet)) {
+			ssize_t readLen = read(readPipe.Get(), buffer.data(), bufferSize);
+			if (readLen < 0) {
+				if (errno == EAGAIN || errno == EWOULDBLOCK) {
+					continue;
+				}
+				return B_ERROR;
+			}
+			if (readLen == 0) {
+				break;
+			}
+			data.insert(data.end(), buffer.begin(), buffer.begin() + readLen);
+		} else if (ret == 0) {
 			break;
+		} else {
+			return B_ERROR;
 		}
 	}
 	return B_OK;
 }
+
 
 BMessage *HaikuDataSource::ToMessage()
 {
@@ -193,8 +232,6 @@ void HaikuDataDevice::ClipboardWatcher::MessageReceived(BMessage *msg)
 {
 	switch (msg->what) {
 	case B_CLIPBOARD_CHANGED: {
-		msg->PrintToStream();
-
 		AutoLocker<BClipboard> clipboard(be_clipboard);
 		if (!clipboard.IsLocked()) return;
 
