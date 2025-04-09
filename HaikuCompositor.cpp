@@ -118,6 +118,7 @@ private:
 
 	HaikuSurface *fSurface;
 	uint32 fOldMouseBtns = 0;
+	bool fFramerateLimitDisabled = false;
 	WaylandEnv *fActiveWlEnv {};
 
 public:
@@ -131,14 +132,19 @@ public:
 	void WindowActivated(bool active) final;
 	void MessageReceived(BMessage *msg) final;
 	void Draw(BRect dirty);
+	void Pulse(void);
 };
 
 
 WaylandView::WaylandView(HaikuSurface *surface):
-	BView(BRect(), "WaylandView", B_FOLLOW_NONE, B_WILL_DRAW | B_TRANSPARENT_BACKGROUND | B_INPUT_METHOD_AWARE),
+	BView(BRect(), "WaylandView", B_FOLLOW_NONE, B_WILL_DRAW | B_TRANSPARENT_BACKGROUND | B_INPUT_METHOD_AWARE | B_PULSE_NEEDED),
 	fSurface(surface)
 {
 	SetViewColor(B_TRANSPARENT_COLOR);
+
+	char *envValue = getenv("HIWAY_FRAMERATE_LIMIT");
+	if (envValue != NULL)
+		fFramerateLimitDisabled = (strcmp(envValue, "disabled") == 0);
 }
 
 WaylandView::~WaylandView()
@@ -236,9 +242,15 @@ void WaylandView::Draw(BRect dirty)
 		viewLocked->DrawBitmap(bmp);
 	}
 
-	fSurface->CallFrameCallbacks();
+	if (fSurface && fFramerateLimitDisabled)
+		fSurface->CallFrameCallbacks();
 }
 
+void WaylandView::Pulse(void)
+{
+	if (fSurface && !fFramerateLimitDisabled)
+		fSurface->CallFrameCallbacks();
+}
 
 //#pragma mark - HaikuSurface
 
