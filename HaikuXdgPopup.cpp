@@ -28,6 +28,7 @@ WaylandPopupWindow::WaylandPopupWindow(HaikuXdgPopup *popup, BRect frame, const 
 	BWindow(frame, title, look, feel, flags, workspace),
 	fPopup(popup)
 {
+	SetPulseRate(1000000 / 60); // 60 fps
 }
 
 bool WaylandPopupWindow::QuitRequested()
