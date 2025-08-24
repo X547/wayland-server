@@ -224,14 +224,6 @@ void WaylandView::Draw(BRect dirty)
 				mode = B_OP_COPY;
 				break;
 		}
-		if (mode == B_OP_ALPHA && fSurface->fState.opaqueRgn.has_value()) {
-			viewLocked->ConstrainClippingRegion(&fSurface->fState.opaqueRgn.value());
-			viewLocked->SetDrawingMode(B_OP_COPY);
-			viewLocked->DrawBitmap(bmp);
-			BRegion remaining = viewLocked->Bounds();
-			remaining.Exclude(&fSurface->fState.opaqueRgn.value());
-			viewLocked->ConstrainClippingRegion(&remaining);
-		}
 		viewLocked->SetDrawingMode(mode);
 		const auto &viewportSrc = fSurface->fState.viewportSrc;
 		const auto &viewportDst = fSurface->fState.viewportDst;
