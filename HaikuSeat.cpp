@@ -6,6 +6,7 @@
 #include "WaylandKeycodes.h"
 #include "XkbKeymap.h"
 #include <SupportDefs.h>
+#include <InterfaceDefs.h>
 #include <Application.h>
 #include <Window.h>
 #include <View.h>
@@ -25,6 +26,21 @@ enum {
 
 static HaikuSeatGlobal *sHaikuSeat = NULL;
 
+
+static uint32 GetCurrentModifiers()
+{
+	uint32 mods = 0;
+	uint32 systemMods = modifiers();
+
+	if (systemMods & B_SHIFT_KEY)   mods |= (1 << 0);  // Shift
+	if (systemMods & B_CAPS_LOCK)   mods |= (1 << 1);  // Caps Lock
+	if (systemMods & B_COMMAND_KEY) mods |= (1 << 2);  // Control (Cmd)
+	if (systemMods & B_CONTROL_KEY) mods |= (1 << 3);  // Mod1 (Alt)
+	if (systemMods & B_NUM_LOCK)    mods |= (1 << 4);  // Mod2 (NumLock)
+	if (systemMods & B_OPTION_KEY)  mods |= (1 << 7);  // Mod5 (Option)
+
+	return mods;
+}
 
 uint32_t FromHaikuKeyCode(uint32 haikuKey)
 {
@@ -162,11 +178,12 @@ static uint32_t FromHaikuMouseBtnCode(uint32 haikuBtn)
 static uint32_t FromHaikuModifiers(uint32 haikuModifiers)
 {
 	uint32_t wlModifiers = 0;
-	if (B_SHIFT_KEY   & haikuModifiers) wlModifiers |= (1 << 0);
-	if (B_COMMAND_KEY & haikuModifiers) wlModifiers |= (1 << 2);
-	if (B_CONTROL_KEY & haikuModifiers) wlModifiers |= (1 << 3) | (1 << 18);
-	if (B_CAPS_LOCK   & haikuModifiers) wlModifiers |= (1 << 1);
-	if (B_NUM_LOCK    & haikuModifiers) wlModifiers |= (1 << 4);
+	if (B_SHIFT_KEY   & haikuModifiers) wlModifiers |= (1 << 0);  // Shift
+	if (B_CAPS_LOCK   & haikuModifiers) wlModifiers |= (1 << 1);  // Caps Lock
+	if (B_COMMAND_KEY & haikuModifiers) wlModifiers |= (1 << 2);  // Control (Cmd)
+	if (B_CONTROL_KEY & haikuModifiers) wlModifiers |= (1 << 3);  // Mod1 (Alt)
+	if (B_NUM_LOCK    & haikuModifiers) wlModifiers |= (1 << 4);  // Mod2 (NumLock)
+	if (B_OPTION_KEY  & haikuModifiers) wlModifiers |= (1 << 7);  // Mod5 (Option)
 	return wlModifiers;
 }
 
@@ -611,8 +628,12 @@ void HaikuSeatGlobal::UpdateKeymap()
 	FileDescriptorCloser fdCloser(fd);
 	struct stat st{};
 	fstat(fd, &st);
+
 	for (HaikuKeyboard *keyboard = fKeyboardIfaces.First(); keyboard != NULL; keyboard = fKeyboardIfaces.GetNext(keyboard)) {
 		keyboard->SendKeymap(WlKeyboard::keymapFormatXkbV1, fd, st.st_size);
+
+		uint32_t currentModifiers = GetCurrentModifiers();
+		keyboard->SendModifiers(NextSerial(), currentModifiers, 0, 0, 0);
 	}
 }
 
@@ -643,6 +664,9 @@ void HaikuSeat::HandleGetKeyboard(uint32_t id)
 	fGlobal->fKeyboardIfaces.Insert(keyboard);
 
 	fGlobal->UpdateKeymap();
+
+	uint32_t currentModifiers = GetCurrentModifiers();
+	keyboard->SendModifiers(fGlobal->NextSerial(), currentModifiers, 0, 0, 0);
 }
 
 void HaikuSeat::HandleGetTouch(uint32_t id)
