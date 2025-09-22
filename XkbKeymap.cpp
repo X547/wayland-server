@@ -5,6 +5,7 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <time.h>
+#include <string.h>
 
 #include <InterfaceDefs.h>
 #include <AutoDeleter.h>
@@ -43,6 +44,22 @@ static int CreateMemoryFile()
 	return -1;
 }
 
+static uint32 GetOffsetForLevel(key_map *map, uint32 haikuKey, int level)
+{
+	if (haikuKey >= 128) return 0;
+
+	switch (level) {
+		case 0: return map->normal_map[haikuKey];
+		case 1: return map->shift_map[haikuKey];
+		case 2: return map->caps_map[haikuKey];
+		case 3: return map->caps_shift_map[haikuKey];
+		case 4: return map->option_map[haikuKey];
+		case 5: return map->option_shift_map[haikuKey];
+		case 6: return map->option_caps_map[haikuKey];
+		case 7: return map->option_caps_shift_map[haikuKey];
+		default: return map->normal_map[haikuKey];
+	}
+}
 
 static void WriteSymbol(FILE *file, uint32 haikuKey, char *keyBuffer, uint32 offset)
 {
@@ -59,12 +76,28 @@ static void WriteSymbol(FILE *file, uint32 haikuKey, char *keyBuffer, uint32 off
 		case 0x0b: fprintf(file, "F10"); return;
 		case 0x0c: fprintf(file, "F11"); return;
 		case 0x0d: fprintf(file, "F12"); return;
+		case 0x0e: fprintf(file, "Print"); return;
+		case 0x0f: fprintf(file, "Scroll_Lock"); return;
+		case 0x10: fprintf(file, "Pause"); return;
+		case 0x22: fprintf(file, "Num_Lock"); return;
+		case 0x3b: fprintf(file, "Caps_Lock"); return;
 		default: break;
 	}
-	uint32 codepoint = 0;
+
+	if (offset == 0 || keyBuffer == NULL) {
+		fprintf(file, "NoSymbol");
+		return;
+	}
+
 	uint32 len = (uint8)keyBuffer[offset];
-	if (len > 0) {
-		const char *bytes = &keyBuffer[offset + 1];
+	if (len == 0) {
+		fprintf(file, "NoSymbol");
+		return;
+	}
+
+	const char *bytes = &keyBuffer[offset + 1];
+
+	if (len == 1) {
 		switch (bytes[0]) {
 			case B_BACKSPACE:   fprintf(file, "BackSpace"); return;
 			case B_RETURN:      fprintf(file, "Return"); return;
@@ -80,30 +113,325 @@ static void WriteSymbol(FILE *file, uint32 haikuKey, char *keyBuffer, uint32 off
 			case B_END:         fprintf(file, "End"); return;
 			case B_PAGE_UP:     fprintf(file, "Prior"); return;
 			case B_PAGE_DOWN:   fprintf(file, "Next"); return;
+			case B_SPACE:       fprintf(file, "space"); return;
 			default: break;
 		}
-		codepoint = UTF8ToCharCode(&bytes);
 	}
-	fprintf(file, "U%04" B_PRIx32, codepoint);
+
+	uint32 codepoint = 0;
+	if (len == 1 && (uint8)bytes[0] < 0x80)
+		codepoint = (uint32)bytes[0];
+	else if (len > 1)
+		codepoint = UTF8ToCharCode(&bytes);
+	else
+		codepoint = (uint8)bytes[0];
+
+	if (codepoint == 0) {
+		fprintf(file, "NoSymbol");
+		return;
+	}
+
+	switch (codepoint) {
+		case 32:  fprintf(file, "space"); return;
+		case 33:  fprintf(file, "exclam"); return;
+		case 34:  fprintf(file, "quotedbl"); return;
+		case 35:  fprintf(file, "numbersign"); return;
+		case 36:  fprintf(file, "dollar"); return;
+		case 37:  fprintf(file, "percent"); return;
+		case 38:  fprintf(file, "ampersand"); return;
+		case 39:  fprintf(file, "apostrophe"); return;
+		case 40:  fprintf(file, "parenleft"); return;
+		case 41:  fprintf(file, "parenright"); return;
+		case 42:  fprintf(file, "asterisk"); return;
+		case 43:  fprintf(file, "plus"); return;
+		case 44:  fprintf(file, "comma"); return;
+		case 45:  fprintf(file, "minus"); return;
+		case 46:  fprintf(file, "period"); return;
+		case 47:  fprintf(file, "slash"); return;
+		case 58:  fprintf(file, "colon"); return;
+		case 59:  fprintf(file, "semicolon"); return;
+		case 60:  fprintf(file, "less"); return;
+		case 61:  fprintf(file, "equal"); return;
+		case 62:  fprintf(file, "greater"); return;
+		case 63:  fprintf(file, "question"); return;
+		case 64:  fprintf(file, "at"); return;
+		case 91:  fprintf(file, "bracketleft"); return;
+		case 92:  fprintf(file, "backslash"); return;
+		case 93:  fprintf(file, "bracketright"); return;
+		case 94:  fprintf(file, "asciicircum"); return;
+		case 95:  fprintf(file, "underscore"); return;
+		case 96:  fprintf(file, "grave"); return;
+		case 123: fprintf(file, "braceleft"); return;
+		case 124: fprintf(file, "bar"); return;
+		case 125: fprintf(file, "braceright"); return;
+		case 126: fprintf(file, "asciitilde"); return;
+		default: break;
+	}
+
+	if (codepoint >= 32 && codepoint != 127)
+		fprintf(file, "U%04X", codepoint);
+	else
+		fprintf(file, "NoSymbol");
+}
+
+static void GenerateKeycodes(FILE *file)
+{
+	fprintf(file, "\txkb_keycodes \"(unnamed)\" {\n");
+	int minimum = 8;
+	int maximum = 708;
+	fprintf(file, "\t\tminimum = %d;\n", minimum);
+	fprintf(file, "\t\tmaximum = %d;\n", maximum);
+
+	for (int i = minimum + 1; i <= maximum; i++)
+		fprintf(file, "\t\t<I%d> = %d;\n", i, i);
+
+	fprintf(file, "\t};\n");
+}
+
+static void GenerateTypes(FILE *file)
+{
+	fprintf(file, "\txkb_types \"(unnamed)\" {\n");
+
+	fprintf(file, "\t\ttype \"FOUR_LEVEL\" {\n");
+	fprintf(file, "\t\t\tmodifiers = Shift+Mod5;\n");
+	fprintf(file, "\t\t\tmap[Shift] = 2;\n");
+	fprintf(file, "\t\t\tmap[Mod5] = 3;\n");
+	fprintf(file, "\t\t\tmap[Mod5+Shift] = 4;\n");
+	fprintf(file, "\t\t\tlevel_name[1] = \"Base\";\n");
+	fprintf(file, "\t\t\tlevel_name[2] = \"Shift\";\n");
+	fprintf(file, "\t\t\tlevel_name[3] = \"AltGr\";\n");
+	fprintf(file, "\t\t\tlevel_name[4] = \"AltGr+Shift\";\n");
+	fprintf(file, "\t\t};\n");
+
+	fprintf(file, "\t\ttype \"KEYPAD\" {\n");
+	fprintf(file, "\t\t\tmodifiers = Shift+Mod2;\n");
+	fprintf(file, "\t\t\tmap[None] = 1;\n");
+	fprintf(file, "\t\t\tmap[Shift] = 1;\n");
+	fprintf(file, "\t\t\tmap[Mod2] = 2;\n");
+	fprintf(file, "\t\t\tmap[Shift+Mod2] = 2;\n");
+	fprintf(file, "\t\t\tlevel_name[1] = \"Base\";\n");
+	fprintf(file, "\t\t\tlevel_name[2] = \"Number\";\n");
+	fprintf(file, "\t\t};\n");
+
+	fprintf(file, "\t};\n");
+}
+
+static void GenerateCompatibility(FILE *file)
+{
+	fprintf(file, "\txkb_compatibility \"(unnamed)\" {\n");
+
+	fprintf(file, "\t\tinterpret Shift_L+AnyOf(all) {\n");
+	fprintf(file, "\t\t\tuseModMapMods = level1;\n");
+	fprintf(file, "\t\t\taction = SetMods(modifiers=Shift);\n");
+	fprintf(file, "\t\t};\n");
+
+	fprintf(file, "\t\tinterpret Shift_R+AnyOf(all) {\n");
+	fprintf(file, "\t\t\tuseModMapMods = level1;\n");
+	fprintf(file, "\t\t\taction = SetMods(modifiers=Shift);\n");
+	fprintf(file, "\t\t};\n");
+
+	fprintf(file, "\t\tinterpret Control_L+AnyOf(all) {\n");
+	fprintf(file, "\t\t\tuseModMapMods = level1;\n");
+	fprintf(file, "\t\t\taction = SetMods(modifiers=Control);\n");
+	fprintf(file, "\t\t};\n");
+
+	fprintf(file, "\t\tinterpret Control_R+AnyOf(all) {\n");
+	fprintf(file, "\t\t\tuseModMapMods = level1;\n");
+	fprintf(file, "\t\t\taction = SetMods(modifiers=Control);\n");
+	fprintf(file, "\t\t};\n");
+
+	fprintf(file, "\t\tinterpret Alt_L+AnyOf(all) {\n");
+	fprintf(file, "\t\t\tuseModMapMods = level1;\n");
+	fprintf(file, "\t\t\taction = SetMods(modifiers=Mod1);\n");
+	fprintf(file, "\t\t};\n");
+
+	fprintf(file, "\t\tinterpret Alt_R+AnyOf(all) {\n");
+	fprintf(file, "\t\t\tuseModMapMods = level1;\n");
+	fprintf(file, "\t\t\taction = SetMods(modifiers=Mod5);\n");
+	fprintf(file, "\t\t};\n");
+
+	fprintf(file, "\t\tinterpret Super_L+AnyOf(all) {\n");
+	fprintf(file, "\t\t\tuseModMapMods = level1;\n");
+	fprintf(file, "\t\t\taction = SetGroup(group=2);\n");
+	fprintf(file, "\t\t};\n");
+
+	fprintf(file, "\t\tinterpret Super_R+AnyOf(all) {\n");
+	fprintf(file, "\t\t\tuseModMapMods = level1;\n");
+	fprintf(file, "\t\t\taction = SetGroup(group=2);\n");
+	fprintf(file, "\t\t};\n");
+
+	fprintf(file, "\t\tinterpret Num_Lock+AnyOf(all) {\n");
+	fprintf(file, "\t\t\tuseModMapMods = level1;\n");
+	fprintf(file, "\t\t\taction = LockMods(modifiers=Mod2);\n");
+	fprintf(file, "\t\t};\n");
+
+	fprintf(file, "\t\tinterpret Caps_Lock+AnyOf(all) {\n");
+	fprintf(file, "\t\t\tuseModMapMods = level1;\n");
+	fprintf(file, "\t\t\taction = LockMods(modifiers=Lock);\n");
+	fprintf(file, "\t\t};\n");
+
+	fprintf(file, "\t};\n");
+}
+
+static bool IsNumpadDigitKey(uint32 haikuKey)
+{
+	return (haikuKey >= 0x37 && haikuKey <= 0x39) ||  // KP7-KP9
+		   (haikuKey >= 0x48 && haikuKey <= 0x4a) ||  // KP4-KP6
+		   (haikuKey >= 0x58 && haikuKey <= 0x5a) ||  // KP1-KP3
+		   (haikuKey == 0x64 || haikuKey == 0x65);    // KP0, KP_Decimal
+}
+
+static bool IsNumpadOperatorKey(uint32 haikuKey)
+{
+	return (haikuKey >= 0x23 && haikuKey <= 0x25) ||  // KP_Divide, KP_Multiply, KP_Subtract
+		   (haikuKey == 0x3a) ||                       // KP_Add
+		   (haikuKey == 0x5b);                         // KP_Enter
+}
+
+static void WriteNumpadDigitSymbol(FILE *file, uint32 haikuKey)
+{
+	switch (haikuKey) {
+		case 0x37: fprintf(file, "KP_Home, KP_7"); break;      // KP_7
+		case 0x38: fprintf(file, "KP_Up, KP_8"); break;        // KP_8
+		case 0x39: fprintf(file, "KP_Prior, KP_9"); break;     // KP_9
+		case 0x48: fprintf(file, "KP_Left, KP_4"); break;      // KP_4
+		case 0x49: fprintf(file, "KP_Begin, KP_5"); break;     // KP_5
+		case 0x4a: fprintf(file, "KP_Right, KP_6"); break;     // KP_6
+		case 0x58: fprintf(file, "KP_End, KP_1"); break;       // KP_1
+		case 0x59: fprintf(file, "KP_Down, KP_2"); break;      // KP_2
+		case 0x5a: fprintf(file, "KP_Next, KP_3"); break;      // KP_3
+		case 0x64: fprintf(file, "KP_Insert, KP_0"); break;    // KP_0
+		case 0x65: fprintf(file, "KP_Delete, KP_Decimal"); break; // KP_Decimal
+		default: fprintf(file, "NoSymbol, NoSymbol"); break;
+	}
+}
+
+static void WriteNumpadOperatorSymbol(FILE *file, uint32 haikuKey)
+{
+	switch (haikuKey) {
+		case 0x23: fprintf(file, "KP_Divide, KP_Divide, KP_Divide, KP_Divide"); break;     // KP_Divide
+		case 0x24: fprintf(file, "KP_Multiply, KP_Multiply, KP_Multiply, KP_Multiply"); break; // KP_Multiply
+		case 0x25: fprintf(file, "KP_Subtract, KP_Subtract, KP_Subtract, KP_Subtract"); break; // KP_Subtract
+		case 0x3a: fprintf(file, "KP_Add, KP_Add, KP_Add, KP_Add"); break;                 // KP_Add
+		case 0x5b: fprintf(file, "KP_Enter, KP_Enter, KP_Enter, KP_Enter"); break;         // KP_Enter
+		default: fprintf(file, "NoSymbol, NoSymbol, NoSymbol, NoSymbol"); break;
+	}
 }
 
 static void GenerateSymbols(FILE *file, key_map *map, char *keyBuffer)
 {
+	fprintf(file, "\txkb_symbols \"(unnamed)\" {\n");
+	fprintf(file, "\t\tname[Group1]=\"Current\";\n");
+	fprintf(file, "\t\tname[Group2]=\"Latin\";\n");
+
+	struct USLayout {
+		uint32 haikuKey;
+		const char* symbols[4]; // Base, Shift, AltGr, AltGr+Shift
+	} usLayout[] = {
+		{0x27, {"q", "Q", "NoSymbol", "NoSymbol"}},
+		{0x28, {"w", "W", "NoSymbol", "NoSymbol"}},
+		{0x29, {"e", "E", "NoSymbol", "NoSymbol"}},
+		{0x2a, {"r", "R", "NoSymbol", "NoSymbol"}},
+		{0x2b, {"t", "T", "NoSymbol", "NoSymbol"}},
+		{0x2c, {"y", "Y", "NoSymbol", "NoSymbol"}},
+		{0x2d, {"u", "U", "NoSymbol", "NoSymbol"}},
+		{0x2e, {"i", "I", "NoSymbol", "NoSymbol"}},
+		{0x2f, {"o", "O", "NoSymbol", "NoSymbol"}},
+		{0x30, {"p", "P", "NoSymbol", "NoSymbol"}},
+		{0x3c, {"a", "A", "NoSymbol", "NoSymbol"}},
+		{0x3d, {"s", "S", "NoSymbol", "NoSymbol"}},
+		{0x3e, {"d", "D", "NoSymbol", "NoSymbol"}},
+		{0x3f, {"f", "F", "NoSymbol", "NoSymbol"}},
+		{0x40, {"g", "G", "NoSymbol", "NoSymbol"}},
+		{0x41, {"h", "H", "NoSymbol", "NoSymbol"}},
+		{0x42, {"j", "J", "NoSymbol", "NoSymbol"}},
+		{0x43, {"k", "K", "NoSymbol", "NoSymbol"}},
+		{0x44, {"l", "L", "NoSymbol", "NoSymbol"}},
+		{0x4c, {"z", "Z", "NoSymbol", "NoSymbol"}},
+		{0x4d, {"x", "X", "NoSymbol", "NoSymbol"}},
+		{0x4e, {"c", "C", "NoSymbol", "NoSymbol"}},
+		{0x4f, {"v", "V", "NoSymbol", "NoSymbol"}},
+		{0x50, {"b", "B", "NoSymbol", "NoSymbol"}},
+		{0x51, {"n", "N", "NoSymbol", "NoSymbol"}},
+		{0x52, {"m", "M", "NoSymbol", "NoSymbol"}},
+		{0x12, {"1", "exclam", "NoSymbol", "NoSymbol"}},
+		{0x13, {"2", "at", "NoSymbol", "NoSymbol"}},
+		{0x14, {"3", "numbersign", "NoSymbol", "NoSymbol"}},
+		{0x15, {"4", "dollar", "NoSymbol", "NoSymbol"}},
+		{0x16, {"5", "percent", "NoSymbol", "NoSymbol"}},
+		{0x17, {"6", "asciicircum", "NoSymbol", "NoSymbol"}},
+		{0x18, {"7", "ampersand", "NoSymbol", "NoSymbol"}},
+		{0x19, {"8", "asterisk", "NoSymbol", "NoSymbol"}},
+		{0x1a, {"9", "parenleft", "NoSymbol", "NoSymbol"}},
+		{0x1b, {"0", "parenright", "NoSymbol", "NoSymbol"}},
+		{0, {NULL, NULL, NULL, NULL}}
+	};
+
 	for (uint32 haikuKey = 0x01; haikuKey <= 0x6b; haikuKey++) {
 		uint32 wlKey = FromHaikuKeyCode(haikuKey);
 		if (wlKey == 0) continue;
-		fprintf(file, "\t\tkey <I%" B_PRIu32 "> {type = \"Haiku\", symbols[Group1] = [", wlKey + 8);
-		WriteSymbol(file, haikuKey, keyBuffer, map->normal_map[haikuKey]); fprintf(file, ", ");
-		WriteSymbol(file, haikuKey, keyBuffer, map->shift_map[haikuKey]); fprintf(file, ", ");
-		WriteSymbol(file, haikuKey, keyBuffer, map->caps_map[haikuKey]); fprintf(file, ", ");
-		WriteSymbol(file, haikuKey, keyBuffer, map->caps_shift_map[haikuKey]); fprintf(file, ", ");
-		WriteSymbol(file, haikuKey, keyBuffer, map->option_map[haikuKey]); fprintf(file, ", ");
-		WriteSymbol(file, haikuKey, keyBuffer, map->option_shift_map[haikuKey]); fprintf(file, ", ");
-		WriteSymbol(file, haikuKey, keyBuffer, map->option_caps_map[haikuKey]); fprintf(file, ", ");
-		WriteSymbol(file, haikuKey, keyBuffer, map->option_caps_shift_map[haikuKey]); //fprintf(file, ", ");
-		//WriteSymbol(file, haikuKey, keyBuffer, map->control_map[haikuKey]);
-		fprintf(file, "]};\n");
+
+		if (IsNumpadDigitKey(haikuKey)) {
+			fprintf(file, "\t\tkey <I%" B_PRIu32 "> {type = \"KEYPAD\", symbols[Group1] = [", wlKey + 8);
+			WriteNumpadDigitSymbol(file, haikuKey);
+			fprintf(file, "]};\n");
+		} else if (IsNumpadOperatorKey(haikuKey)) {
+			fprintf(file, "\t\tkey <I%" B_PRIu32 "> {type = \"FOUR_LEVEL\", symbols[Group1] = [", wlKey + 8);
+			WriteNumpadOperatorSymbol(file, haikuKey);
+			fprintf(file, "], symbols[Group2] = [");
+			WriteNumpadOperatorSymbol(file, haikuKey);
+			fprintf(file, "]};\n");
+		} else {
+			fprintf(file, "\t\tkey <I%" B_PRIu32 "> {type = \"FOUR_LEVEL\", symbols[Group1] = [", wlKey + 8);
+
+			// Group1 - current keymap
+			uint32 offsets[4] = {
+				GetOffsetForLevel(map, haikuKey, 0), // normal
+				GetOffsetForLevel(map, haikuKey, 1), // shift
+				GetOffsetForLevel(map, haikuKey, 4), // option (AltGr)
+				GetOffsetForLevel(map, haikuKey, 5)  // option+shift
+			};
+
+			for (int level = 0; level < 4; level++) {
+				WriteSymbol(file, haikuKey, keyBuffer, offsets[level]);
+				if (level < 3) fprintf(file, ", ");
+			}
+
+			// Group2 - latin keymap for hotkeys
+			fprintf(file, "], symbols[Group2] = [");
+
+			bool foundUS = false;
+			for (int i = 0; usLayout[i].haikuKey != 0; i++) {
+				if (usLayout[i].haikuKey == haikuKey) {
+					for (int level = 0; level < 4; level++) {
+						fprintf(file, "%s", usLayout[i].symbols[level]);
+						if (level < 3) fprintf(file, ", ");
+					}
+					foundUS = true;
+					break;
+				}
+			}
+
+			if (!foundUS) {
+				for (int level = 0; level < 4; level++) {
+					WriteSymbol(file, haikuKey, keyBuffer, offsets[level]);
+					if (level < 3) fprintf(file, ", ");
+				}
+			}
+
+			fprintf(file, "]};\n");
+		}
 	}
+
+	fprintf(file, "\t\tmodifier_map Shift {<I50>, <I62>};\n");
+	fprintf(file, "\t\tmodifier_map Lock {<I66>};\n");
+	fprintf(file, "\t\tmodifier_map Control {<I37>, <I105>};\n");
+	fprintf(file, "\t\tmodifier_map Mod1 {<I64>};\n");            // Left Alt
+	fprintf(file, "\t\tmodifier_map Mod2 {<I77>};\n");            // NumLock
+	fprintf(file, "\t\tmodifier_map Mod4 {<I133>, <I134>};\n");   // Super (Command)
+	fprintf(file, "\t\tmodifier_map Mod5 {<I108>};\n");           // Right Alt (AltGr)
+
+	fprintf(file, "\t};\n");
 }
 
 status_t ProduceXkbKeymap(int &fd)
@@ -128,58 +456,12 @@ status_t ProduceXkbKeymap(int &fd)
 
 	fprintf(file, "xkb_keymap {\n");
 
-	fprintf(file, "\txkb_keycodes \"(unnamed)\" {\n");
-	int minimum = 8;
-	int maximum = 708;
-	fprintf(file, "\t\tminimum = %d;\n", minimum);
-	fprintf(file, "\t\tmaximum = %d;\n", maximum);
-	for (int i = minimum + 1; i <= maximum; i++) {
-		fprintf(file, "\t\t<I%d> = %d;\n", i, i);
-	}
-	fprintf(file, "\t};\n");
-
-	fprintf(file, "\txkb_types \"(unnamed)\" {\n");
-	fprintf(file, "\t\tvirtual_modifiers NumLock,Alt,LevelThree,LevelFive,Meta,Super,Hyper,ScrollLock;\n");
-	fprintf(file, "\t\ttype \"Haiku\" {\n");
-	fprintf(file, "\t\t\tmodifiers = Shift+Lock+Mod4;\n");
-	fprintf(file, "\t\t\tmap[Shift] = 2;\n");
-	fprintf(file, "\t\t\tmap[Lock] = 3;\n");
-	fprintf(file, "\t\t\tmap[Shift+Lock] = 4;\n");
-	fprintf(file, "\t\t\tmap[Mod4] = 5;\n");
-	fprintf(file, "\t\t\tmap[Mod4+Shift] = 6;\n");
-	fprintf(file, "\t\t\tmap[Mod4+Lock] = 7;\n");
-	fprintf(file, "\t\t\tmap[Mod4+Lock+Shift] = 8;\n");
-	//fprintf(file, "\t\t\tmap[Control] = 9;\n");
-	fprintf(file, "\t\t\tlevel_name[1] = \"Base\";\n");
-	fprintf(file, "\t\t\tlevel_name[2] = \"Shift\";\n");
-	fprintf(file, "\t\t\tlevel_name[3] = \"Caps\";\n");
-	fprintf(file, "\t\t\tlevel_name[4] = \"Caps+Shift\";\n");
-	fprintf(file, "\t\t\tlevel_name[5] = \"Option\";\n");
-	fprintf(file, "\t\t\tlevel_name[6] = \"Option+Shift\";\n");
-	fprintf(file, "\t\t\tlevel_name[7] = \"Option+Caps\";\n");
-	fprintf(file, "\t\t\tlevel_name[8] = \"Option+Caps+Shift\";\n");
-	//fprintf(file, "\t\t\tlevel_name[9] = \"Control\";\n");
-	fprintf(file, "\t\t};\n");
-	fprintf(file, "\t};\n");
-
-	fprintf(file, "\txkb_compatibility \"(unnamed)\" {\n");
-	fprintf(file, "\t};\n");
-
-	fprintf(file, "\txkb_symbols \"(unnamed)\" {\n");
-	fprintf(file, "\t\tname[Group1]=\"Unnamed\";\n");
+	GenerateKeycodes(file);
+	GenerateTypes(file);
+	GenerateCompatibility(file);
 	GenerateSymbols(file, map, keyBuffer);
-	fprintf(file, "\t\tmodifier_map Shift {<I50>, <I62>};\n");
-	fprintf(file, "\t\tmodifier_map Lock {<I66>};\n");
-	fprintf(file, "\t\tmodifier_map Control {<I37>, <I105>};\n");
-	fprintf(file, "\t\tmodifier_map Mod1 {<I64>, <I108>, <I204>, <I205>};\n"); // Alt
-	fprintf(file, "\t\tmodifier_map Mod2 {<I77>};\n");
-	fprintf(file, "\t\tmodifier_map Mod3 {<I203>};\n");
-	fprintf(file, "\t\tmodifier_map Mod4 {<I133>, <I134>, <I206>, <I207>};\n"); // Option
-	fprintf(file, "\t\tmodifier_map Mod5 {<I92>};\n");
-	fprintf(file, "\t};\n");
 
 	fprintf(file, "};\n");
-
 	fputc(0, file);
 
 	fdCloser.Detach();

@@ -86,11 +86,30 @@ void WaylandWindow::FrameResized(float newWidth, float newHeight)
 void WaylandWindow::DispatchMessage(BMessage *msg, BHandler *target)
 {
 	switch (msg->what) {
+	case B_KEY_UP:
+	case B_UNMAPPED_KEY_UP:
 	case B_KEY_DOWN:
 	case B_UNMAPPED_KEY_DOWN:
-		// Do not use built-in shortcut handling.
-		target->MessageReceived(msg);
-		return;
+		{
+			int32 key;
+			uint32 modifiers;
+			if (msg->FindInt32("key", &key) == B_OK) {
+				msg->FindInt32("modifiers", (int32*)&modifiers);
+				if (key == 0x0e) { // Print Screen
+					BWindow::DispatchMessage(msg, target);
+					return;
+				}
+				if (modifiers & B_CONTROL_KEY) {
+					switch (key) {
+						case 0x26: // Command + Tab
+							BWindow::DispatchMessage(msg, target);
+							return;
+					}
+				}
+			}
+			target->MessageReceived(msg);
+			return;
+		}
 	}
 	BWindow::DispatchMessage(msg, target);
 }
