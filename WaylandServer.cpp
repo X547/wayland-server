@@ -21,7 +21,12 @@
 #include <new>
 
 #include <Application.h>
+#include <String.h>
+#include <File.h>
 #include <OS.h>
+#include <AppFileInfo.h>
+#include <kernel/image.h>
+
 #include "AppKitPtrs.h"
 
 
@@ -67,7 +72,7 @@ private:
 	struct wl_client *fClient{};
 
 public:
-	Application();
+	Application(const char *signature);
 	virtual ~Application() = default;
 
 	void AddClient(struct wl_client *client);
@@ -76,7 +81,7 @@ public:
 	void MessageReceived(BMessage *msg) override;
 };
 
-Application::Application(): BApplication("application/x-vnd.Wayland-App")
+Application::Application(const char *signature): BApplication(signature)
 {
 }
 
@@ -118,8 +123,27 @@ extern "C" _EXPORT int wl_ips_client_connected(void **clientOut, void *clientDis
 		gWaylandLooper->Run();
 	}
 
-	new Application();
-	be_app->Run();
+	if (be_app == NULL) {
+		BString signature = "application/x-vnd.Wayland-App";
+		int32 cookie = 0;
+		image_info info;
+		while (get_next_image_info(B_CURRENT_TEAM, &cookie, &info) == B_OK) {
+			if (info.type != B_APP_IMAGE)
+				continue;
+			BFile appFile(info.name, B_READ_ONLY);
+			if (appFile.InitCheck() == B_OK) {
+				BAppFileInfo info(&appFile);
+				if (info.InitCheck() == B_OK) {
+					char file_signature[B_MIME_TYPE_LENGTH];
+					if (info.GetSignature(file_signature) == B_OK)
+						signature.SetTo(file_signature);
+				}
+			}
+			break;
+		}
+		new Application(signature.String());
+		be_app->Run();
+	}
 
 	fprintf(stderr, "wl_ips_client_connected\n");
 	if (sDisplay == NULL) {
