@@ -171,6 +171,28 @@ static uint32_t FromHaikuModifiers(uint32 haikuModifiers)
 	return wlModifiers;
 }
 
+static bool IsModifierKey(uint32 haikuKey)
+{
+	switch (FromHaikuKeyCode(haikuKey)) {
+		case KEY_SCROLLLOCK:
+		case KEY_NUMLOCK:
+		case KEY_CAPSLOCK:
+		case KEY_LEFTSHIFT:
+		case KEY_RIGHTSHIFT:
+		case KEY_LEFTCTRL:
+		case KEY_RIGHTCTRL:
+		case KEY_LEFTALT:
+		case KEY_RIGHTALT:
+		case KEY_LEFTMETA:
+		case KEY_RIGHTMETA:
+		case KEY_COMPOSE:
+			return true;
+		default:
+			break;
+	}
+	return false;
+}
+
 class SurfaceCursorHook: public HaikuSurface::Hook {
 public:
 	BPoint fHotspot;
@@ -414,6 +436,7 @@ bool HaikuSeatGlobal::MessageReceived(HaikuSurface *surface, BMessage *msg)
 			if (fKeyboardFocus != surface) return false;
 			int32 key;
 			msg->FindInt32("key", &key);
+			if ((msg->what == B_UNMAPPED_KEY_UP || msg->what == B_UNMAPPED_KEY_DOWN) && !IsModifierKey(key)) return false;
 			uint32_t state = (msg->what == B_KEY_UP || msg->what == B_UNMAPPED_KEY_UP) ? WlKeyboard::keyStateReleased : WlKeyboard::keyStatePressed;
 
 			uint32_t wlKey = FromHaikuKeyCode(key);
