@@ -14,6 +14,9 @@
 #include <Window.h>
 #include <Screen.h>
 
+#include <cmath>
+#include <algorithm>
+
 static void Assert(bool cond) {if (!cond) abort();}
 
 
@@ -21,6 +24,8 @@ class WaylandWindow: public BWindow {
 private:
 	friend class HaikuXdgToplevel;
 	HaikuXdgToplevel *fToplevel;
+
+	void UpdateRefreshRate();
 
 public:
 	WaylandWindow(HaikuXdgToplevel *toplevel, BRect frame, const char* title, window_look look, window_feel feel, uint32 flags, uint32 workspace = B_CURRENT_WORKSPACE);
@@ -30,6 +35,7 @@ public:
 
 	bool QuitRequested() final;
 	void WindowActivated(bool isActive) final;
+	void WorkspacesChanged(uint32 oldWorkspace, uint32 newWorkspace) final;
 	void FrameResized(float newWidth, float newHeight) final;
 	void DispatchMessage(BMessage *msg, BHandler *target) final;
 };
@@ -57,6 +63,14 @@ void WaylandWindow::WindowActivated(bool isActive)
 		fToplevel->DoSendConfigure();
 		fToplevel->XdgSurface()->SendConfigure(fToplevel->XdgSurface()->NextSerial());
 	}
+
+	if (isActive)
+		UpdateRefreshRate();
+}
+
+void WaylandWindow::WorkspacesChanged(uint32 oldWorkspace, uint32 newWorkspace)
+{
+	UpdateRefreshRate();
 }
 
 void WaylandWindow::FrameResized(float newWidth, float newHeight)
@@ -112,6 +126,22 @@ void WaylandWindow::DispatchMessage(BMessage *msg, BHandler *target)
 		}
 	}
 	BWindow::DispatchMessage(msg, target);
+}
+
+void WaylandWindow::UpdateRefreshRate()
+{
+	float rate = 60.0;
+
+	BScreen scr(B_MAIN_SCREEN_ID);
+	display_mode mode;
+	if (scr.GetMode(&mode) == B_OK)	{
+		float screenrate = rint(10 * float(mode.timing.pixel_clock * 1000)
+						/ float(mode.timing.h_total * mode.timing.v_total)) / 10.0;
+		if (!std::isnan(screenrate))
+			rate = std::clamp(screenrate, 25.0f, 144.0f);
+	}
+
+	SetPulseRate(1000000 / rate);
 }
 
 
