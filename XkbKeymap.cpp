@@ -61,7 +61,7 @@ static uint32 GetOffsetForLevel(key_map *map, uint32 haikuKey, int level)
 	}
 }
 
-static void WriteSymbol(FILE *file, uint32 haikuKey, char *keyBuffer, uint32 offset)
+static void WriteSymbol(FILE *file, uint32 haikuKey, char *keyBuffer, uint32 offset, const key_map* map)
 {
 	switch (haikuKey) {
 		case 0x02: fprintf(file, "F1"); return;
@@ -77,6 +77,17 @@ static void WriteSymbol(FILE *file, uint32 haikuKey, char *keyBuffer, uint32 off
 		case 0x0c: fprintf(file, "F11"); return;
 		case 0x0d: fprintf(file, "F12"); return;
 		case 0x0e: fprintf(file, "Print"); return;
+
+		case 0x4b: fprintf(file, "Shift_L"); return;
+		case 0x56: fprintf(file, "Shift_R"); return;
+		case 0x5c: fprintf(file, "Control_L"); return;
+		case 0x60: fprintf(file, "Control_R"); return;
+		case 0x5d: fprintf(file, "Alt_L"); return;
+		case 0x5f: fprintf(file, "Alt_R"); return;
+		case 0x66: fprintf(file, "Super_L"); return;
+		case 0x67: fprintf(file, "Super_R"); return;
+		case 0x68: fprintf(file, "Menu"); return;
+
 		case 0x0f: fprintf(file, "Scroll_Lock"); return;
 		case 0x10: fprintf(file, "Pause"); return;
 		case 0x22: fprintf(file, "Num_Lock"); return;
@@ -129,6 +140,39 @@ static void WriteSymbol(FILE *file, uint32 haikuKey, char *keyBuffer, uint32 off
 	if (codepoint == 0) {
 		fprintf(file, "NoSymbol");
 		return;
+	}
+
+	if (map != NULL) {
+		const char* dead = NULL;
+		switch (codepoint) {
+			case 0x0027:
+				if (map->acute_tables) dead = "dead_acute";
+				break;
+			case 0x0022:
+				if (map->dieresis_tables) dead = "dead_diaeresis";
+				break;
+			case 0x0060:
+				if (map->grave_tables) dead = "dead_grave";
+				break;
+			case 0x007E:
+				if (map->tilde_tables) dead = "dead_tilde";
+				break;
+			case 0x005E:
+				if (map->circumflex_tables) dead = "dead_circumflex";
+				break;
+			case 0x00B4:
+				if (map->acute_tables) dead = "dead_acute";
+				break;
+			case 0x00A8:
+				if (map->dieresis_tables) dead = "dead_diaeresis";
+				break;
+			default:
+				break;
+		}
+		if (dead != NULL) {
+			fprintf(file, "%s", dead);
+			return;
+		}
 	}
 
 	switch (codepoint) {
@@ -393,7 +437,7 @@ static void GenerateSymbols(FILE *file, key_map *map, char *keyBuffer)
 			};
 
 			for (int level = 0; level < 4; level++) {
-				WriteSymbol(file, haikuKey, keyBuffer, offsets[level]);
+				WriteSymbol(file, haikuKey, keyBuffer, offsets[level], map);
 				if (level < 3) fprintf(file, ", ");
 			}
 
@@ -414,7 +458,7 @@ static void GenerateSymbols(FILE *file, key_map *map, char *keyBuffer)
 
 			if (!foundUS) {
 				for (int level = 0; level < 4; level++) {
-					WriteSymbol(file, haikuKey, keyBuffer, offsets[level]);
+					WriteSymbol(file, haikuKey, keyBuffer, offsets[level], map);
 					if (level < 3) fprintf(file, ", ");
 				}
 			}
