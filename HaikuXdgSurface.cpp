@@ -78,7 +78,7 @@ void XdgSurfaceHook::HandleCommit()
 		) {
 			fXdgSurface->Window()->MoveBy(
 				fXdgSurface->fGeometry.x - fXdgSurface->fPendingGeometry.x,
-				fXdgSurface->fGeometry.y - fXdgSurface->fPendingGeometry.x
+				fXdgSurface->fGeometry.y - fXdgSurface->fPendingGeometry.y
 			);
 		}
 		if (fXdgSurface->Surface()->Bitmap() != NULL) {
