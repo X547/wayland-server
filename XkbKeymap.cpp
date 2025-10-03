@@ -61,7 +61,86 @@ static uint32 GetOffsetForLevel(key_map *map, uint32 haikuKey, int level)
 	}
 }
 
-static void WriteSymbol(FILE *file, uint32 haikuKey, char *keyBuffer, uint32 offset, const key_map* map)
+static uint32 GetTableMaskForLevel(int level)
+{
+	switch (level) {
+		case 0: return B_NORMAL_TABLE;
+		case 1: return B_SHIFT_TABLE;
+		case 2: return B_CAPS_TABLE;
+		case 3: return B_CAPS_SHIFT_TABLE;
+		case 4: return B_OPTION_TABLE;
+		case 5: return B_OPTION_SHIFT_TABLE;
+		case 6: return B_OPTION_CAPS_TABLE;
+		case 7: return B_OPTION_CAPS_SHIFT_TABLE;
+		default: return 0;
+	}
+}
+
+static uint32 GetCharacterAtOffset(char *keyBuffer, uint32 offset)
+{
+	if (offset == 0 || keyBuffer == NULL)
+		return 0;
+
+	uint32 len = (uint8)keyBuffer[offset];
+	if (len == 0)
+		return 0;
+
+	const char *bytes = &keyBuffer[offset + 1];
+
+	uint32 codepoint = 0;
+	if (len == 1 && (uint8)bytes[0] < 0x80)
+		codepoint = (uint32)bytes[0];
+	else if (len > 1)
+		codepoint = UTF8ToCharCode(&bytes);
+	else
+		codepoint = (uint8)bytes[0];
+
+	return codepoint;
+}
+
+static bool IsDeadKeyForLevel(const key_map *map, char *keyBuffer, uint32 offset, int level)
+{
+	if (map == NULL || keyBuffer == NULL || offset == 0)
+		return false;
+	uint32 character = GetCharacterAtOffset(keyBuffer, offset);
+	if (character == 0)
+		return false;
+
+	uint32 tableMask = GetTableMaskForLevel(level);
+	if (tableMask == 0)
+		return false;
+
+	const int32 *deadKeyArrays[] = {
+		map->acute_dead_key,
+		map->grave_dead_key,
+		map->circumflex_dead_key,
+		map->dieresis_dead_key,
+		map->tilde_dead_key
+	};
+
+	const uint32 tableMasks[] = {
+		map->acute_tables,
+		map->grave_tables,
+		map->circumflex_tables,
+		map->dieresis_tables,
+		map->tilde_tables
+	};
+
+	for (int i = 0; i < 5; i++) {
+		if ((tableMasks[i] & tableMask) == 0)
+			continue;
+
+		uint32 deadKeyOffset = deadKeyArrays[i][1];
+		uint32 deadKeyChar = GetCharacterAtOffset(keyBuffer, deadKeyOffset);
+
+		if (character == deadKeyChar)
+			return true;
+	}
+
+	return false;
+}
+
+static void WriteSymbol(FILE *file, uint32 haikuKey, char *keyBuffer, uint32 offset, const key_map* map, int level)
 {
 	switch (haikuKey) {
 		case 0x02: fprintf(file, "F1"); return;
@@ -142,29 +221,29 @@ static void WriteSymbol(FILE *file, uint32 haikuKey, char *keyBuffer, uint32 off
 		return;
 	}
 
-	if (map != NULL) {
+	if (map != NULL && IsDeadKeyForLevel(map, keyBuffer, offset, level)) {
 		const char* dead = NULL;
 		switch (codepoint) {
 			case 0x0027:
-				if (map->acute_tables) dead = "dead_acute";
+				dead = "dead_acute";
 				break;
 			case 0x0022:
-				if (map->dieresis_tables) dead = "dead_diaeresis";
+				dead = "dead_diaeresis";
 				break;
 			case 0x0060:
-				if (map->grave_tables) dead = "dead_grave";
+				dead = "dead_grave";
 				break;
 			case 0x007E:
-				if (map->tilde_tables) dead = "dead_tilde";
+				dead = "dead_tilde";
 				break;
 			case 0x005E:
-				if (map->circumflex_tables) dead = "dead_circumflex";
+				dead = "dead_circumflex";
 				break;
 			case 0x00B4:
-				if (map->acute_tables) dead = "dead_acute";
+				dead = "dead_acute";
 				break;
 			case 0x00A8:
-				if (map->dieresis_tables) dead = "dead_diaeresis";
+				dead = "dead_diaeresis";
 				break;
 			default:
 				break;
@@ -436,8 +515,9 @@ static void GenerateSymbols(FILE *file, key_map *map, char *keyBuffer)
 				GetOffsetForLevel(map, haikuKey, 5)  // option+shift
 			};
 
+			int levels[4] = {0, 1, 4, 5};
 			for (int level = 0; level < 4; level++) {
-				WriteSymbol(file, haikuKey, keyBuffer, offsets[level], map);
+				WriteSymbol(file, haikuKey, keyBuffer, offsets[level], map, levels[level]);
 				if (level < 3) fprintf(file, ", ");
 			}
 
@@ -458,7 +538,7 @@ static void GenerateSymbols(FILE *file, key_map *map, char *keyBuffer)
 
 			if (!foundUS) {
 				for (int level = 0; level < 4; level++) {
-					WriteSymbol(file, haikuKey, keyBuffer, offsets[level], map);
+					WriteSymbol(file, haikuKey, keyBuffer, offsets[level], NULL, levels[level]);
 					if (level < 3) fprintf(file, ", ");
 				}
 			}
