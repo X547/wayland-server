@@ -1,3 +1,4 @@
+
 project('WaylandServer', 'c', 'cpp',
 	version : '0.1',
 	default_options : ['warning_level=3', 'cpp_std=c++2a']
@@ -126,6 +127,7 @@ shared_library('wayland-server-inproc',
 	],
 	dependencies: [
 		cpp.find_library('be'),
+		cpp.find_library('translation'),
 		wlserverdep,
 	],
 	gnu_symbol_visibility: 'hidden',
