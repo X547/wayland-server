@@ -5,6 +5,7 @@
 #include "HaikuXdgToplevel.h"
 #include "HaikuXdgPopup.h"
 #include "HaikuSeat.h"
+#include "HaikuDataDeviceManager.h"
 #include "Wayland.h"
 #include "WaylandEnv.h"
 #include <wayland-server-core.h>
@@ -188,8 +189,20 @@ void WaylandView::MessageReceived(BMessage *msg)
 {
 	{
 		WaylandEnv wlEnv(this, &fActiveWlEnv);
+
 		HaikuSeatGlobal *seat = HaikuGetSeat(fSurface->Client());
 		if (seat != NULL) {
+			if (msg->what == B_COPY_TARGET) {
+				entry_ref dirRef;
+				BString name;
+				if (msg->FindRef("directory", &dirRef) == B_OK && msg->FindString("name", &name) == B_OK) {
+					if (seat->DataDevice() != NULL) {
+						seat->DataDevice()->HandleCopyTargetReply(msg, dirRef, name);
+						return;
+					}
+				}
+			}
+
 			bool isPointerMessage = true;
 			BPoint where;
 			if (msg->WasDropped()) {

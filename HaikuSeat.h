@@ -92,6 +92,8 @@ public:
 	virtual ~HaikuSeatGlobal() = default;
 	void Bind(struct wl_client *wl_client, uint32_t version, uint32_t id) override;
 
+	HaikuDataDevice *DataDevice() const { return fDataDevice; }
+
 	void SetPointerFocus(HaikuSurface *surface, const BMessage &msg, TrackId trackId);
 	void SetPointerFocus(HaikuSurface *surface, bool setFocus, const BMessage &msg, TrackId trackId = trackClient);
 	void SetKeyboardFocus(HaikuSurface *surface, bool setFocus);

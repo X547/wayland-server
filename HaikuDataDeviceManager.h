@@ -6,6 +6,8 @@
 #include <vector>
 #include <Looper.h>
 #include <Handler.h>
+#include <Entry.h>
+#include <String.h>
 
 
 class HaikuSeat;
@@ -20,7 +22,6 @@ private:
 	std::set<std::string> fMimeTypes;
 
 	static void ConvertToHaikuMessage(BMessage &dstMsg, const BMessage &srcMsg);
-
 
 public:
 	static HaikuDataSource *FromResource(struct wl_resource *resource) {return (HaikuDataSource*)WlResource::FromResource(resource);}
@@ -37,6 +38,9 @@ public:
 
 class HaikuDataOffer: public WlDataOffer {
 private:
+	friend class HaikuDataDevice;
+
+	HaikuDataDevice *fDataDevice{};
 	BMessage fData;
 
 public:
@@ -52,23 +56,36 @@ public:
 class HaikuDataDevice: public WlDataDevice {
 private:
 	friend class HaikuDataSource;
+	friend class HaikuDataOffer;
 
-	HaikuSeat *fSeat;
-	HaikuDataSource *fDataSource;
+	HaikuSeat *fSeat{};
+	HaikuDataSource *fDataSource{};
+	bool fDropPending = false;
+	BMessage fLastDragMessage;
 
 	class ClipboardWatcher: public BHandler {
+	private:
+		HaikuDataDevice *fDevice;
 	public:
-		inline HaikuDataDevice &Base() {return *(HaikuDataDevice*)((char*)this - offsetof(HaikuDataDevice, fClipboardWatcher));}
-
-		ClipboardWatcher();
+		ClipboardWatcher(HaikuDataDevice *device);
 		virtual ~ClipboardWatcher() = default;
+		inline HaikuDataDevice &Base() { return *fDevice; }
 		void MessageReceived(BMessage *msg) final;
 	} fClipboardWatcher;
 
 public:
+	HaikuDataDevice();
 	static HaikuDataDevice *Create(struct wl_client *client, uint32_t version, uint32_t id, struct wl_resource *seat);
 	static HaikuDataDevice *FromResource(struct wl_resource *resource) {return (HaikuDataDevice*)WlResource::FromResource(resource);}
 	virtual ~HaikuDataDevice();
+
+	bool HasDataSource() const { return fDataSource != NULL; }
+	bool IsDropPending() const { return fDropPending; }
+	void SetDropPending(bool pending) { fDropPending = pending; }
+
+	void CancelDrag();
+	void FinishDrag();
+	void HandleCopyTargetReply(BMessage *replyMsg, const entry_ref &dirRef, const BString &name);
 
 	void HandleStartDrag(struct wl_resource *source, struct wl_resource *origin, struct wl_resource *icon, uint32_t serial) final;
 	void HandleSetSelection(struct wl_resource *source, uint32_t serial) final;

@@ -32,6 +32,9 @@ public:
 	void HandleSetContentType(uint32_t hint, uint32_t purpose) final;
 	void HandleSetCursorRectangle(int32_t x, int32_t y, int32_t width, int32_t height) final;
 	void HandleCommit() final;
+	void HandleSetAvailableActions(struct wl_array *available_actions) final {};
+	void HandleShowInputPanel() final {};
+	void HandleHideInputPanel() final {};
 };
 
 
