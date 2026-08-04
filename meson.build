@@ -126,6 +126,7 @@ shared_library('wayland-server-inproc',
 	],
 	dependencies: [
 		cpp.find_library('be'),
+		cpp.find_library('translation'),
 		wlserverdep,
 	],
 	gnu_symbol_visibility: 'hidden',
