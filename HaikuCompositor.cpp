@@ -20,6 +20,7 @@
 #include <Bitmap.h>
 #include <Region.h>
 #include <Cursor.h>
+#include <Entry.h>
 
 extern const struct wl_interface wl_compositor_interface;
 
@@ -121,6 +122,10 @@ private:
 	uint32 fOldMouseBtns = 0;
 	bool fFramerateLimitDisabled = false;
 	WaylandEnv *fActiveWlEnv {};
+	BBitmap *fOffscreenBitmap {};
+	BView *fOffscreenView {};
+
+	void DrawSurfaceTree(BView *targetView, HaikuSurface *surface, BPoint origin);
 
 public:
 	WaylandView(HaikuSurface *surface);
@@ -138,7 +143,7 @@ public:
 
 
 WaylandView::WaylandView(HaikuSurface *surface):
-	BView(BRect(), "WaylandView", B_FOLLOW_NONE, B_WILL_DRAW | B_TRANSPARENT_BACKGROUND | B_INPUT_METHOD_AWARE | B_PULSE_NEEDED),
+	BView(BRect(), "WaylandView", B_FOLLOW_NONE, B_WILL_DRAW | B_DRAW_ON_CHILDREN | B_INPUT_METHOD_AWARE | B_PULSE_NEEDED),
 	fSurface(surface)
 {
 	SetViewColor(B_TRANSPARENT_COLOR);
@@ -155,6 +160,8 @@ WaylandView::WaylandView(HaikuSurface *surface):
 
 WaylandView::~WaylandView()
 {
+	delete fOffscreenBitmap;
+
 	if (fSurface != NULL) {
 		debugger("[!] ~WaylandView: bad deletion");
 	}
@@ -227,44 +234,169 @@ void WaylandView::MessageReceived(BMessage *msg)
 	BView::MessageReceived(msg);
 }
 
+void WaylandView::DrawSurfaceTree(BView *targetView, HaikuSurface *surface, BPoint origin)
+{
+	if (surface == NULL) return;
+
+	BBitmap *bmp = surface->Bitmap();
+	if (bmp != NULL) {
+		BRect viewRect(origin.x, origin.y, origin.x + surface->Size().width, origin.y + surface->Size().height);
+
+		BRegion targetClip;
+		targetView->GetClippingRegion(&targetClip);
+		if (targetClip.Intersects(viewRect)) {
+			drawing_mode mode = B_OP_COPY;
+			switch (bmp->ColorSpace()) {
+				case B_RGBA64:
+				case B_RGBA32:
+				case B_RGBA15:
+				case B_RGBA64_BIG:
+				case B_RGBA32_BIG:
+				case B_RGBA15_BIG:
+					mode = B_OP_ALPHA;
+					break;
+				default:
+					mode = B_OP_COPY;
+					break;
+			}
+
+			const auto &viewportSrc = surface->fState.viewportSrc;
+			const auto &viewportDst = surface->fState.viewportDst;
+
+			if (mode == B_OP_ALPHA && surface->fState.opaqueRgn.has_value()) {
+				BRegion opaque = surface->fState.opaqueRgn.value();
+				opaque.OffsetBy(origin.x, origin.y);
+				opaque.IntersectWith(&targetClip);
+				targetView->ConstrainClippingRegion(&opaque);
+				targetView->SetDrawingMode(B_OP_COPY);
+				if (viewportSrc.IsValid() && viewportDst.IsValid()) {
+					BRect bitmapRect(viewportSrc.x, viewportSrc.y, viewportSrc.x + viewportSrc.width - 1, viewportSrc.y + viewportSrc.height - 1);
+					targetView->DrawBitmap(bmp, bitmapRect, viewRect);
+				} else {
+					targetView->DrawBitmap(bmp, viewRect.LeftTop());
+				}
+				BRegion remaining(targetClip);
+				remaining.Exclude(&opaque);
+				targetView->ConstrainClippingRegion(&remaining);
+			}
+
+			targetView->SetDrawingMode(mode);
+			if (viewportSrc.IsValid() && viewportDst.IsValid()) {
+				BRect bitmapRect(viewportSrc.x, viewportSrc.y, viewportSrc.x + viewportSrc.width - 1, viewportSrc.y + viewportSrc.height - 1);
+				targetView->DrawBitmap(bmp, bitmapRect, viewRect);
+			} else {
+				targetView->DrawBitmap(bmp, viewRect.LeftTop());
+			}
+			targetView->ConstrainClippingRegion(&targetClip);
+		}
+	}
+
+	for (HaikuSubsurface *subsurface = surface->SurfaceList().First(); subsurface != NULL; subsurface = surface->SurfaceList().GetNext(subsurface)) {
+		BPoint childOrigin = origin + BPoint(subsurface->GetState().x, subsurface->GetState().y);
+		DrawSurfaceTree(targetView, subsurface->Surface(), childOrigin);
+	}
+}
+
 void WaylandView::Draw(BRect dirty)
 {
 	WaylandEnv wlEnv(this, &fActiveWlEnv);
 
-	BBitmap *bmp = fSurface->Bitmap();
-	if (bmp != NULL) {
-		auto viewLocked = AppKitPtrs::LockedPtr(this);
-		drawing_mode mode;
-		switch (bmp->ColorSpace()) {
-			case B_RGBA64:
-			case B_RGBA32:
-			case B_RGBA15:
-			case B_RGBA64_BIG:
-			case B_RGBA32_BIG:
-			case B_RGBA15_BIG:
-				mode = B_OP_ALPHA;
-				break;
-			default:
-				mode = B_OP_COPY;
-				break;
+	if (fSurface == NULL || fSurface->Subsurface() != NULL) return;
+
+	auto viewLocked = AppKitPtrs::LockedPtr(this);
+
+	BRect bounds = viewLocked->Bounds();
+	if (!bounds.IsValid()) return;
+
+	if (fSurface->SurfaceList().IsEmpty()) {
+		if (fOffscreenBitmap != NULL) {
+			delete fOffscreenBitmap;
+			fOffscreenBitmap = NULL;
+			fOffscreenView = NULL;
 		}
-		if (mode == B_OP_ALPHA && fSurface->fState.opaqueRgn.has_value()) {
-			viewLocked->ConstrainClippingRegion(&fSurface->fState.opaqueRgn.value());
+		BBitmap *bmp = fSurface->Bitmap();
+		if (bmp != NULL) {
+			drawing_mode mode = B_OP_COPY;
+			switch (bmp->ColorSpace()) {
+				case B_RGBA64:
+				case B_RGBA32:
+				case B_RGBA15:
+				case B_RGBA64_BIG:
+				case B_RGBA32_BIG:
+				case B_RGBA15_BIG:
+					mode = B_OP_ALPHA;
+					break;
+				default:
+					mode = B_OP_COPY;
+					break;
+			}
+
+			const auto &viewportSrc = fSurface->fState.viewportSrc;
+			const auto &viewportDst = fSurface->fState.viewportDst;
+
+			if (mode == B_OP_ALPHA && fSurface->fState.opaqueRgn.has_value()) {
+				viewLocked->ConstrainClippingRegion(&fSurface->fState.opaqueRgn.value());
+				viewLocked->SetDrawingMode(B_OP_COPY);
+				if (viewportSrc.IsValid() && viewportDst.IsValid()) {
+					BRect bitmapRect(viewportSrc.x, viewportSrc.y, viewportSrc.x + viewportSrc.width - 1, viewportSrc.y + viewportSrc.height - 1);
+					BRect viewRect(0, 0, viewportDst.width - 1, viewportDst.height - 1);
+					viewLocked->DrawBitmap(bmp, bitmapRect, viewRect);
+				} else {
+					viewLocked->DrawBitmap(bmp);
+				}
+				BRegion remaining = viewLocked->Bounds();
+				remaining.Exclude(&fSurface->fState.opaqueRgn.value());
+				viewLocked->ConstrainClippingRegion(&remaining);
+			}
+
+			viewLocked->SetDrawingMode(mode);
+			if (viewportSrc.IsValid() && viewportDst.IsValid()) {
+				BRect bitmapRect(viewportSrc.x, viewportSrc.y, viewportSrc.x + viewportSrc.width - 1, viewportSrc.y + viewportSrc.height - 1);
+				BRect viewRect(0, 0, viewportDst.width - 1, viewportDst.height - 1);
+				viewLocked->DrawBitmap(bmp, bitmapRect, viewRect);
+			} else {
+				viewLocked->DrawBitmap(bmp);
+			}
+			viewLocked->ConstrainClippingRegion(NULL);
+		}
+	} else {
+		bool isNewBitmap = false;
+		if (fOffscreenBitmap == NULL || fOffscreenBitmap->Bounds() != bounds) {
+			delete fOffscreenBitmap;
+			fOffscreenBitmap = new(std::nothrow) BBitmap(bounds, B_RGBA32, true);
+			if (fOffscreenBitmap != NULL) {
+				fOffscreenView = new(std::nothrow) BView(bounds, "offscreen", B_FOLLOW_ALL, B_WILL_DRAW);
+				if (fOffscreenView != NULL) {
+					fOffscreenBitmap->AddChild(fOffscreenView);
+					isNewBitmap = true;
+				} else {
+					delete fOffscreenBitmap;
+					fOffscreenBitmap = NULL;
+					fOffscreenView = NULL;
+				}
+			}
+		}
+
+		if (fOffscreenBitmap != NULL && fOffscreenBitmap->Lock()) {
+			fOffscreenView->SetHighColor(ui_color(B_PANEL_BACKGROUND_COLOR));
+
+			if (isNewBitmap) {
+				fOffscreenView->ConstrainClippingRegion(NULL);
+				fOffscreenView->FillRect(fOffscreenView->Bounds());
+			} else {
+				BRegion dirtyRegion(dirty);
+				fOffscreenView->ConstrainClippingRegion(&dirtyRegion);
+				fOffscreenView->FillRect(dirty);
+			}
+
+			DrawSurfaceTree(fOffscreenView, fSurface, B_ORIGIN);
+
+			fOffscreenView->ConstrainClippingRegion(NULL);
+			fOffscreenView->Sync();
+			fOffscreenBitmap->Unlock();
+
 			viewLocked->SetDrawingMode(B_OP_COPY);
-			viewLocked->DrawBitmap(bmp);
-			BRegion remaining = viewLocked->Bounds();
-			remaining.Exclude(&fSurface->fState.opaqueRgn.value());
-			viewLocked->ConstrainClippingRegion(&remaining);
-		}
-		viewLocked->SetDrawingMode(mode);
-		const auto &viewportSrc = fSurface->fState.viewportSrc;
-		const auto &viewportDst = fSurface->fState.viewportDst;
-		if (viewportSrc.IsValid() && viewportDst.IsValid()) {
-			BRect bitmapRect(viewportSrc.x, viewportSrc.y, viewportSrc.x + viewportSrc.width - 1, viewportSrc.y + viewportSrc.height - 1);
-			BRect viewRect(0, 0, viewportDst.width - 1, viewportDst.height - 1);
-			viewLocked->DrawBitmap(bmp, bitmapRect, viewRect);
-		} else {
-			viewLocked->DrawBitmap(bmp);
+			viewLocked->DrawBitmap(fOffscreenBitmap, dirty, dirty);
 		}
 	}
 
@@ -380,10 +512,19 @@ void HaikuSurface::Invalidate()
 	if (fView == NULL) {
 		return;
 	}
-	auto viewLocked = AppKitPtrs::LockedPtr(fView);
+
 	if (fSubsurface != NULL) {
-		viewLocked->Invalidate();
+		HaikuSurface *root = fSubsurface->Root();
+		if (root != NULL && root->View() != NULL) {
+			auto rootLocked = AppKitPtrs::LockedPtr(root->View());
+			int32_t offsetX = 0, offsetY = 0;
+			fSubsurface->GetOffset(offsetX, offsetY);
+			BRegion rootDirty(fDirty);
+			rootDirty.OffsetBy(offsetX, offsetY);
+			rootLocked->Invalidate(&rootDirty);
+		}
 	} else {
+		auto viewLocked = AppKitPtrs::LockedPtr(fView);
 		viewLocked->Invalidate(&fDirty);
 	}
 	fDirty.MakeEmpty();
@@ -470,7 +611,7 @@ void HaikuSurface::HandleCommit()
 		fPendingFields &= ~(1U << field);
 		switch (field) {
 			case fieldBuffer:
-				if (fState.buffer != NULL && fState.buffer != fPendingState.buffer) {
+				if (fState.buffer != NULL) {
 					fState.buffer->SendRelease();
 				}
 				fState.buffer = fPendingState.buffer;
