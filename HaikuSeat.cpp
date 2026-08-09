@@ -324,7 +324,7 @@ void HaikuSeatGlobal::SetPointerFocus(HaikuSurface *surface, const BMessage &msg
 			if (fDataDevice != NULL) {
 				BMessage data;
 				msg.FindMessage("be:drag_message", &data);
-				HaikuDataOffer *dataOffer = HaikuDataOffer::Create(fDataDevice, data);
+				HaikuDataOffer *dataOffer = HaikuDataOffer::Create(fDataDevice, data, true);
 				if (dataOffer != NULL) {
 					fDataDevice->SendEnter(NextSerial(), fPointerFocus->ToResource(), wl_fixed_from_double(where.x), wl_fixed_from_double(where.y), dataOffer->ToResource());
 				}
@@ -546,7 +546,7 @@ bool HaikuSeatGlobal::MessageReceived(HaikuSurface *surface, BMessage *msg)
 			return true;
 		}
 		case B_MOUSE_UP: {
-			if (fDataDevice != NULL && fDataDevice->HasDataSource()) {
+			if (fDataDevice != NULL && fDataDevice->HasDragSource()) {
 				if (!fDataDevice->IsDropPending() && fTrack.id != trackDrag) {
 					fDataDevice->FinishDrag();
 				}
