@@ -374,8 +374,12 @@ void HaikuDataSource::ConvertToHaikuMessage(BMessage &dstMsg, const BMessage &sr
 
 HaikuDataSource::~HaikuDataSource()
 {
-	if (fDataDevice != NULL && fDataDevice->fDataSource == this)
-		fDataDevice->fDataSource = NULL;
+	if (fDataDevice != NULL) {
+		if (fDataDevice->fDragSource == this)
+			fDataDevice->fDragSource = NULL;
+		if (fDataDevice->fSelectionSource == this)
+			fDataDevice->fSelectionSource = NULL;
+	}
 }
 
 status_t HaikuDataSource::ReadData(std::vector<uint8> &data, const char *mimeType)
@@ -469,7 +473,7 @@ void HaikuDataSource::HandleSetActions(uint32_t dndActions)
 
 //#pragma mark - HaikuDataOffer
 
-HaikuDataOffer *HaikuDataOffer::Create(HaikuDataDevice *dataDevice, const BMessage &data)
+HaikuDataOffer *HaikuDataOffer::Create(HaikuDataDevice *dataDevice, const BMessage &data, bool isDnd)
 {
 	if (dataDevice == NULL)
 		return NULL;
@@ -514,11 +518,17 @@ HaikuDataOffer *HaikuDataOffer::Create(HaikuDataDevice *dataDevice, const BMessa
 		}
 	} else {
 		for (int32 i = 0; data.GetInfo(B_ANY_TYPE, i, &name, &type, &count) == B_OK; i++) {
-			if (type == B_MIME_TYPE || type == B_STRING_TYPE) {
+			if (type == B_MIME_TYPE || type == B_STRING_TYPE || type == B_RAW_TYPE) {
+				if (strncmp(name, "META:", 5) == 0 || strncmp(name, "be:", 3) == 0 ||
+					strncmp(name, "wayland:", 8) == 0 || strcmp(name, "_data") == 0 ||
+					strcmp(name, "_frame") == 0) {
+					continue;
+				}
+
 				data.FindData(name, type, 0, &val, &size);
 				dataOffer->SendOffer(name);
 
-				if (strcmp(name, "text/plain") == 0 && !data.HasData("text/plain;charset=utf-8", B_MIME_TYPE)) {
+				if (strcmp(name, "text/plain") == 0 && !data.HasData("text/plain;charset=utf-8", B_ANY_TYPE)) {
 					dataOffer->SendOffer("text/plain;charset=utf-8");
 				}
 			}
@@ -563,27 +573,27 @@ HaikuDataOffer *HaikuDataOffer::Create(HaikuDataDevice *dataDevice, const BMessa
 			if (metaTitle.IsEmpty())
 				metaTitle = metaUrl;
 
-			if (!dataOffer->fData.HasData("text/plain", B_MIME_TYPE)) {
+			if (!dataOffer->fData.HasData("text/plain", B_ANY_TYPE)) {
 				dataOffer->fData.AddData("text/plain", B_MIME_TYPE, metaUrl.String(), metaUrl.Length());
 				dataOffer->SendOffer("text/plain");
 			}
-			if (!dataOffer->fData.HasData("text/plain;charset=utf-8", B_MIME_TYPE)) {
+			if (!dataOffer->fData.HasData("text/plain;charset=utf-8", B_ANY_TYPE)) {
 				dataOffer->fData.AddData("text/plain;charset=utf-8", B_MIME_TYPE, metaUrl.String(), metaUrl.Length());
 				dataOffer->SendOffer("text/plain;charset=utf-8");
 			}
-			if (!dataOffer->fData.HasData("text/uri-list", B_MIME_TYPE)) {
+			if (!dataOffer->fData.HasData("text/uri-list", B_ANY_TYPE)) {
 				BString uriList = metaUrl;
 				uriList << "\r\n";
 				dataOffer->fData.AddData("text/uri-list", B_MIME_TYPE, uriList.String(), uriList.Length());
 				dataOffer->SendOffer("text/uri-list");
 			}
-			if (!dataOffer->fData.HasData("_NETSCAPE_URL", B_MIME_TYPE)) {
+			if (!dataOffer->fData.HasData("_NETSCAPE_URL", B_ANY_TYPE)) {
 				BString netscapeUrl = metaUrl;
 				netscapeUrl << "\n" << metaTitle;
 				dataOffer->fData.AddData("_NETSCAPE_URL", B_MIME_TYPE, netscapeUrl.String(), netscapeUrl.Length());
 				dataOffer->SendOffer("_NETSCAPE_URL");
 			}
-			if (!dataOffer->fData.HasData("text/x-moz-url", B_MIME_TYPE)) {
+			if (!dataOffer->fData.HasData("text/x-moz-url", B_ANY_TYPE)) {
 				AddUTF16LEData(dataOffer->fData, "text/x-moz-url", metaUrl, metaTitle);
 				dataOffer->SendOffer("text/x-moz-url");
 			}
@@ -601,27 +611,27 @@ HaikuDataOffer *HaikuDataOffer::Create(HaikuDataDevice *dataDevice, const BMessa
 						BString url = attrBuf;
 						BString title = ref.name;
 
-						if (!dataOffer->fData.HasData("text/plain", B_MIME_TYPE)) {
+						if (!dataOffer->fData.HasData("text/plain", B_ANY_TYPE)) {
 							dataOffer->fData.AddData("text/plain", B_MIME_TYPE, url.String(), url.Length());
 							dataOffer->SendOffer("text/plain");
 						}
-						if (!dataOffer->fData.HasData("text/plain;charset=utf-8", B_MIME_TYPE)) {
+						if (!dataOffer->fData.HasData("text/plain;charset=utf-8", B_ANY_TYPE)) {
 							dataOffer->fData.AddData("text/plain;charset=utf-8", B_MIME_TYPE, url.String(), url.Length());
 							dataOffer->SendOffer("text/plain;charset=utf-8");
 						}
-						if (!dataOffer->fData.HasData("text/uri-list", B_MIME_TYPE)) {
+						if (!dataOffer->fData.HasData("text/uri-list", B_ANY_TYPE)) {
 							BString uriList = url;
 							uriList << "\r\n";
 							dataOffer->fData.AddData("text/uri-list", B_MIME_TYPE, uriList.String(), uriList.Length());
 							dataOffer->SendOffer("text/uri-list");
 						}
-						if (!dataOffer->fData.HasData("_NETSCAPE_URL", B_MIME_TYPE)) {
+						if (!dataOffer->fData.HasData("_NETSCAPE_URL", B_ANY_TYPE)) {
 							BString netscapeUrl = url;
 							netscapeUrl << "\n" << title;
 							dataOffer->fData.AddData("_NETSCAPE_URL", B_MIME_TYPE, netscapeUrl.String(), netscapeUrl.Length());
 							dataOffer->SendOffer("_NETSCAPE_URL");
 						}
-						if (!dataOffer->fData.HasData("text/x-moz-url", B_MIME_TYPE)) {
+						if (!dataOffer->fData.HasData("text/x-moz-url", B_ANY_TYPE)) {
 							AddUTF16LEData(dataOffer->fData, "text/x-moz-url", url, title);
 							dataOffer->SendOffer("text/x-moz-url");
 						}
@@ -634,11 +644,11 @@ HaikuDataOffer *HaikuDataOffer::Create(HaikuDataDevice *dataDevice, const BMessa
 				dataOffer->fData.AddData("text/uri-list", B_MIME_TYPE, uriList.String(), uriList.Length());
 				dataOffer->SendOffer("text/uri-list");
 
-				if (!dataOffer->fData.HasData("text/plain", B_MIME_TYPE)) {
+				if (!dataOffer->fData.HasData("text/plain", B_ANY_TYPE)) {
 					dataOffer->fData.AddData("text/plain", B_MIME_TYPE, uriList.String(), uriList.Length());
 					dataOffer->SendOffer("text/plain");
 				}
-				if (!dataOffer->fData.HasData("text/plain;charset=utf-8", B_MIME_TYPE)) {
+				if (!dataOffer->fData.HasData("text/plain;charset=utf-8", B_ANY_TYPE)) {
 					dataOffer->fData.AddData("text/plain;charset=utf-8", B_MIME_TYPE, uriList.String(), uriList.Length());
 					dataOffer->SendOffer("text/plain;charset=utf-8");
 				}
@@ -646,42 +656,54 @@ HaikuDataOffer *HaikuDataOffer::Create(HaikuDataDevice *dataDevice, const BMessa
 		}
 
 		BMessage bitmapArchive;
-		if (data.FindMessage("image/bitmap", &bitmapArchive) == B_OK) {
-			BBitmap *bitmap = new(std::nothrow) BBitmap(&bitmapArchive);
-			if (bitmap != NULL && bitmap->IsValid()) {
+		BBitmap *bitmap = NULL;
+
+		if (data.FindMessage("image/bitmap", &bitmapArchive) == B_OK ||
+			data.FindMessage("image/x-vnd.Be-bitmap", &bitmapArchive) == B_OK) {
+			bitmap = new(std::nothrow) BBitmap(&bitmapArchive);
+		} else if (data.HasData("_data", B_RAW_TYPE) || data.HasRect("_frame")) {
+			bitmap = new(std::nothrow) BBitmap(const_cast<BMessage*>(&data));
+		}
+
+		if (bitmap != NULL) {
+			if (bitmap->InitCheck() == B_OK && bitmap->IsValid()) {
 				std::vector<uint8> pngData;
 				if (ConvertBitmapToPNG(bitmap, pngData) == B_OK && !pngData.empty()) {
-					dataOffer->fData.AddData("image/png", B_MIME_TYPE, pngData.data(), pngData.size());
-					dataOffer->SendOffer("image/png");
+					if (!dataOffer->fData.HasData("image/png", B_ANY_TYPE)) {
+						dataOffer->fData.AddData("image/png", B_MIME_TYPE, pngData.data(), pngData.size());
+						dataOffer->SendOffer("image/png");
+					}
 				}
-				delete bitmap;
 			}
+			delete bitmap;
 		}
 	}
 
-	dataOffer->SendAction(0);
-	dataOffer->SendSourceActions(7);
+	if (isDnd) {
+		dataOffer->SendAction(0);
+		dataOffer->SendSourceActions(7);
+	}
 	return dataOffer;
 }
 
 void HaikuDataOffer::HandleAccept(uint32_t serial, const char *mime_type)
 {
-	if (fDataDevice != NULL && fDataDevice->fDataSource != NULL) {
-		fDataDevice->fDataSource->SendTarget(mime_type);
+	if (fDataDevice != NULL && fDataDevice->fDragSource != NULL) {
+		fDataDevice->fDragSource->SendTarget(mime_type);
 	}
 }
 
 void HaikuDataOffer::HandleReceive(const char *mimeType, int32_t fd)
 {
 	if (strcmp(mimeType, "text/plain;charset=utf-8") == 0) {
-		if (!fData.HasData("text/plain;charset=utf-8", B_MIME_TYPE)) {
+		if (!fData.HasData("text/plain;charset=utf-8", B_ANY_TYPE)) {
 			mimeType = "text/plain";
 		}
 	}
 
 	const uint8 *val;
 	ssize_t size;
-	if (fData.FindData(mimeType, B_MIME_TYPE, 0, (const void**)&val, &size) == B_OK) {
+	if (fData.FindData(mimeType, B_ANY_TYPE, 0, (const void**)&val, &size) == B_OK) {
 		while (size > 0) {
 			ssize_t sizeWritten = write(fd, val, size);
 			if (sizeWritten < 0) {
@@ -698,14 +720,14 @@ void HaikuDataOffer::HandleReceive(const char *mimeType, int32_t fd)
 
 void HaikuDataOffer::HandleFinish()
 {
-	if (fDataDevice != NULL && fDataDevice->fDataSource != NULL) {
-		if (fDataDevice->fDataSource->Version() >= 3) {
-			fDataDevice->fDataSource->SendDndFinished();
+	if (fDataDevice != NULL && fDataDevice->fDragSource != NULL) {
+		if (fDataDevice->fDragSource->Version() >= 3) {
+			fDataDevice->fDragSource->SendDndFinished();
 		} else {
-			fDataDevice->fDataSource->SendCancelled();
+			fDataDevice->fDragSource->SendCancelled();
 		}
-		fDataDevice->fDataSource->fDataDevice = NULL;
-		fDataDevice->fDataSource = NULL;
+		fDataDevice->fDragSource->fDataDevice = NULL;
+		fDataDevice->fDragSource = NULL;
 	}
 }
 
@@ -722,8 +744,8 @@ void HaikuDataOffer::HandleSetActions(uint32_t dnd_actions, uint32_t preferred_a
 
 	SendAction(action);
 
-	if (fDataDevice != NULL && fDataDevice->fDataSource != NULL) {
-		fDataDevice->fDataSource->SendAction(action);
+	if (fDataDevice != NULL && fDataDevice->fDragSource != NULL) {
+		fDataDevice->fDragSource->SendAction(action);
 	}
 }
 
@@ -738,12 +760,17 @@ void HaikuDataDevice::ClipboardWatcher::MessageReceived(BMessage *msg)
 {
 	switch (msg->what) {
 	case B_CLIPBOARD_CHANGED: {
+		if (Base().fIgnoreClipboardChange) {
+			Base().fIgnoreClipboardChange = false;
+			return;
+		}
+
 		AutoLocker<BClipboard> clipboard(be_clipboard);
 		if (!clipboard.IsLocked()) return;
 
-		if (Base().fDataSource != NULL) {
-			Base().fDataSource->SendCancelled();
-			Base().fDataSource = NULL;
+		if (Base().fSelectionSource != NULL) {
+			Base().fSelectionSource->SendCancelled();
+			Base().fSelectionSource = NULL;
 		}
 
 		HaikuDataDevice *dataDevice = &Base();
@@ -777,6 +804,9 @@ HaikuDataDevice *HaikuDataDevice::Create(struct wl_client *client, uint32_t vers
 	AppKitPtrs::LockedPtr(&gServerHandler)->Looper()->AddHandler(&dataDevice->fClipboardWatcher);
 	be_clipboard->StartWatching(BMessenger(&dataDevice->fClipboardWatcher));
 
+	BMessage initMsg(B_CLIPBOARD_CHANGED);
+	dataDevice->fClipboardWatcher.MessageReceived(&initMsg);
+
 	return dataDevice;
 }
 
@@ -790,25 +820,25 @@ HaikuDataDevice::~HaikuDataDevice()
 void HaikuDataDevice::CancelDrag()
 {
 	fDropPending = false;
-	if (fDataSource != NULL) {
-		fDataSource->SendCancelled();
-		fDataSource->fDataDevice = NULL;
-		fDataSource = NULL;
+	if (fDragSource != NULL) {
+		fDragSource->SendCancelled();
+		fDragSource->fDataDevice = NULL;
+		fDragSource = NULL;
 	}
 }
 
 void HaikuDataDevice::FinishDrag()
 {
 	fDropPending = false;
-	if (fDataSource != NULL) {
-		if (fDataSource->Version() >= 3) {
-			fDataSource->SendDndDropPerformed();
-			fDataSource->SendDndFinished();
+	if (fDragSource != NULL) {
+		if (fDragSource->Version() >= 3) {
+			fDragSource->SendDndDropPerformed();
+			fDragSource->SendDndFinished();
 		} else {
-			fDataSource->SendCancelled();
+			fDragSource->SendCancelled();
 		}
-		fDataSource->fDataDevice = NULL;
-		fDataSource = NULL;
+		fDragSource->fDataDevice = NULL;
+		fDragSource = NULL;
 		be_app->SetCursor(B_CURSOR_SYSTEM_DEFAULT, true);
 	}
 }
@@ -861,7 +891,7 @@ void HaikuDataDevice::HandleStartDrag(struct wl_resource *_source, struct wl_res
 	ObjectDeleter<BMessage> dragMsg;
 	if (source != NULL) {
 		dragMsg.SetTo(source->ToMessage());
-		fDataSource = source;
+		fDragSource = source;
 		source->fDataDevice = this;
 	} else {
 		dragMsg.SetTo(new BMessage(B_SIMPLE_DATA));
@@ -912,10 +942,18 @@ void HaikuDataDevice::HandleStartDrag(struct wl_resource *_source, struct wl_res
 
 void HaikuDataDevice::HandleSetSelection(struct wl_resource *_source, uint32_t serial)
 {
-	if (_source == NULL) return;
+	if (_source == NULL) {
+		fSelectionSource = NULL;
+		AutoLocker<BClipboard> clipboard(be_clipboard);
+		if (clipboard.IsLocked()) {
+			fIgnoreClipboardChange = true;
+			clipboard.Get()->Clear();
+			clipboard.Get()->Commit();
+		}
+		return;
+	}
 
 	HaikuDataSource *source = HaikuDataSource::FromResource(_source);
-
 
 	ObjectDeleter<BMessage> srcMsg(source->ToMessage());
 
@@ -926,9 +964,11 @@ void HaikuDataDevice::HandleSetSelection(struct wl_resource *_source, uint32_t s
 	if (clipper == NULL) return;
 	*clipper = *srcMsg.Get();
 	clipper->what = B_MIME_DATA;
+
+	fIgnoreClipboardChange = true;
 	clipboard.Get()->Commit();
 
-	fDataSource = source;
+	fSelectionSource = source;
 	source->fDataDevice = this;
 }
 

@@ -44,7 +44,7 @@ private:
 	BMessage fData;
 
 public:
-	static HaikuDataOffer *Create(HaikuDataDevice *dataDevice, const BMessage &data);
+	static HaikuDataOffer *Create(HaikuDataDevice *dataDevice, const BMessage &data, bool isDnd = false);
 	static HaikuDataOffer *FromResource(struct wl_resource *resource) {return (HaikuDataOffer*)WlResource::FromResource(resource);}
 
 	void HandleAccept(uint32_t serial, const char *mime_type) final;
@@ -59,8 +59,10 @@ private:
 	friend class HaikuDataOffer;
 
 	HaikuSeat *fSeat{};
-	HaikuDataSource *fDataSource{};
+	HaikuDataSource *fDragSource{};
+	HaikuDataSource *fSelectionSource{};
 	bool fDropPending = false;
+	bool fIgnoreClipboardChange = false;
 	BMessage fLastDragMessage;
 
 	class ClipboardWatcher: public BHandler {
@@ -79,7 +81,8 @@ public:
 	static HaikuDataDevice *FromResource(struct wl_resource *resource) {return (HaikuDataDevice*)WlResource::FromResource(resource);}
 	virtual ~HaikuDataDevice();
 
-	bool HasDataSource() const { return fDataSource != NULL; }
+	bool HasDragSource() const { return fDragSource != NULL; }
+	bool HasSelectionSource() const { return fSelectionSource != NULL; }
 	bool IsDropPending() const { return fDropPending; }
 	void SetDropPending(bool pending) { fDropPending = pending; }
 
